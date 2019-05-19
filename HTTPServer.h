@@ -9,6 +9,9 @@
 #include <vector>
 #include <cstring>
 #include <string>
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+
 
 class HTTPServer {
 public:
