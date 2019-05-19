@@ -72,6 +72,12 @@ void HTTPSServer::acceptSSL() {
   }
 }
 
+void HTTPSServer::closeConnection() {
+  SSL_free(ssl);
+
+  HTTPServer::closeConnection();
+}
+
 void HTTPSServer::init_openssl() {
   SSL_load_error_strings();
   OpenSSL_add_ssl_algorithms();
