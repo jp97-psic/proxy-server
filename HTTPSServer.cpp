@@ -35,7 +35,7 @@ void HTTPSServer::startNewConnection() {
   }
 }
 
-bool HTTPServer::receiveMessage() {
+bool HTTPSServer::receiveMessage() {
   buffer.resize(100);
 
   acceptSSL();
