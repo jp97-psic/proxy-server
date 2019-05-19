@@ -11,7 +11,8 @@ public:
 
 
 protected:
- virtual void startNewConnection() override;
+  virtual void startNewConnection() override;
+  virtual bool receiveMessage() override;
 
 private:
   void init_openssl();

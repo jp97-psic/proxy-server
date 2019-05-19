@@ -27,7 +27,7 @@ void HTTPSServer::startNewConnection() {
     perror("accept");
   else
     ssl = SSL_new(ctx);
-    SSL_set_fd(ssl, client);
+    SSL_set_fd(ssl, receiver);
     acceptSSL();
 
     fds.push_back({receiver, POLLIN | POLLOUT, 0});

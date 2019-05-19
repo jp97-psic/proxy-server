@@ -27,6 +27,8 @@ protected:
 	void closeConnection();
 	bool receiveMessage();
 
+	const int sockfd;
+
 	std::vector<pollfd> fds;
 	int currentFdIndex = 0;
 
@@ -47,7 +49,6 @@ private:
 
 	sockaddr_in sin;
 	unsigned size;
-	const int sockfd;
 
 	std::string buffer;
 	std::string query = "";
