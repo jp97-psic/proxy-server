@@ -8,19 +8,19 @@ DEP = $(SRC:.cpp=.d)
 DEP_FLAGS=-MMD -MP
 CXXFLAGS+=$(DEP_FLAGS)
 
-all: server
+all: server.exe
 
-server: HTTPServer.o server.o
+server.exe: HTTPServer.o server.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-run: server
-	./server
+run: server.exe
+	./server.exe
 
-val: server
-	valgrind --leak-check=full ./server
+val: server.exe
+	valgrind --leak-check=full ./server.exe
 
 clean:
-	rm -f *.o *.d server
+	rm -f *.o *.d server.exe
 
 .PHONY: all run val clean
 
