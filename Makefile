@@ -12,7 +12,7 @@ HDR = $(wildcard *.h)
 OBJ = $(SRC:.cpp=.o)
 DEP = $(SRC:.cpp=.d)
 
-APP = server.exe
+APP = server
 ZIP = $(APP).tgz
 
 all: $(APP)
