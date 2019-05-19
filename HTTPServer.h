@@ -31,15 +31,21 @@ private:
 	bool endOfHeader() { return method == "POST" && query.find("\r\n\r\n") != std::string::npos; }
 	void setContentInfo();
 	void sendResponse();
-	std::string getFilePath();
+	std::string getHostname();
+	std::string getFilePath(std::string host);
 	std::string formAnswer(std::string filePath);
+	std::string getAnswer(std::string host, std::string filePath);
 	void printInfo();
 	void closeConnection();
+
+	void connectToServer(std::string);
 
 	sockaddr_in sin;
 	unsigned size;
 	const int sockfd;
 	std::vector<pollfd> fds;
+
+	int serverSocket;
 
 	std::string buffer;
 	std::string query = "";

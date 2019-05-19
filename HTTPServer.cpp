@@ -4,6 +4,9 @@
 #include <sstream>
 #include <fcntl.h>
 #include <stdio.h>
+#include <netdb.h>
+
+#define DEBUG 1
 
 HTTPServer::HTTPServer() : sockfd(socket(AF_INET, SOCK_STREAM, 0)) {
   if(sockfd == -1) {
@@ -156,8 +159,9 @@ void HTTPServer::printInfo() {
 }
 
 void HTTPServer::sendResponse() {
-  std::string filePath = getFilePath();
-  std::string answer = formAnswer(filePath);
+  std::string hostname = getHostname();
+  std::string filePath = getFilePath(hostname);
+  std::string answer = getAnswer(hostname,filePath);
   if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1)
     perror("send");
   std::cout << "// sent: " << filePath << std::endl << std::endl;
@@ -166,14 +170,91 @@ void HTTPServer::sendResponse() {
   query = "";  
 }
 
-std::string HTTPServer::getFilePath() {
-  std::string filePath = "Strona";
-  int begin = method.length()+1;
+std::string HTTPServer::getHostname() {
+  std::string hostname = query.substr(query.find("Host")+4+2);
+  hostname = hostname.substr(0, hostname.find("\r\n"));
+  return hostname;
+}
+
+std::string HTTPServer::getFilePath(std::string hostname) {
+  int begin = query.find(hostname) + hostname.length();
   int length = query.find("HTTP/") - begin-1;
-  filePath += query.substr(begin, length);
-  if(filePath == "Strona/")
-    filePath += "index.html";
+  std::string filePath = query.substr(begin, length);
   return filePath;
+}
+
+std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
+  serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+  if(serverSocket == -1) {
+    perror("socket");
+    exit(1);
+  }
+
+  int option = 1;
+  setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option)); 
+
+  int flags = fcntl(serverSocket, F_GETFL);
+  flags |= O_NONBLOCK;
+  fcntl(serverSocket, F_SETFL, flags);
+
+  hostent *host = gethostbyname(hostname.data());
+  if(host == NULL)
+  {
+    printf("%s is unavailable\n", hostname.data());
+    exit(1);
+  }
+
+  // in_addr *address = (in_addr*) host->h_addr;
+  // std::string ip_address = inet_ntoa(*address);
+
+  sockaddr_in sin;
+  memset(&sin, 0, sizeof(sin));
+  sin.sin_family = AF_INET;
+  sin.sin_port = htons(80);
+  sin.sin_addr.s_addr = inet_addr(inet_ntoa(*(in_addr*) (host -> h_addr_list[0])));
+
+
+  if(connect(serverSocket, (sockaddr*) &sin, sizeof(sin)) == -1 && errno != 115) {
+    perror("connect");
+    exit(1);
+  }
+
+  std::vector<pollfd> innerFds;
+  innerFds.push_back({serverSocket, POLLOUT | POLLIN});
+
+  std::string newQuery = method + " " + filePath + query.substr(query.find(" HTTP/"));
+  std::cout << newQuery;
+
+  int sent = 0;
+  while(sent != newQuery.length()) {
+    poll(innerFds.data(), innerFds.size(), -1);
+
+    if(innerFds[0].revents & POLLOUT) {
+      int status = send(serverSocket, newQuery.data()+sent, newQuery.length()-sent, 0);
+      if(status == -1)
+        perror("send");
+      else
+        sent += status;
+    }
+  }
+  
+  std::string received = "";
+  while(received.find("\r\n\r\n") == std::string::npos) {
+    poll(innerFds.data(), innerFds.size(), -1);
+
+    if(innerFds[0].revents & POLLIN) {
+      received.resize(100000);
+      int status = recv(serverSocket, const_cast<char*>(received.data()), received.length(), 0);
+      received.resize(status);
+    }
+  }
+  std::cout << "\r\n// Received: \r\n" << received << "\n";
+  return received;
+  // return "HTTP/1.0 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 6\r\n\r\nanswer";
+}
+
+void HTTPServer::connectToServer(std::string hostname) {
+
 }
 
 std::string HTTPServer::formAnswer(std::string filePath) {
