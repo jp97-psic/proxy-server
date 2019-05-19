@@ -126,7 +126,6 @@ void HTTPServer::endIfNotHTTPRequest() {
     std::string answer = "501 Not Implemented";
     if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1)
       perror("send");
-    // std::cout << "// sent: " << filePath << std::endl << std::endl;
 
     closeConnection();
     query = "";  

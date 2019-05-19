@@ -16,17 +16,24 @@
 class HTTPServer {
 public:
 	HTTPServer();
-	~HTTPServer();
+	virtual ~HTTPServer();
 
 	void makeNonBlocking();
 	void listenOnAddress(int port, const char* ip);
 	void serve();
 
+protected:
+	virtual void startNewConnection();
+	void closeConnection();
+	bool receiveMessage();
+
+	std::vector<pollfd> fds;
+	int currentFdIndex = 0;
+
+
 private:
 	std::vector<char> readFile (const char* path);
 	void handleEvents();
-	void startNewConnection();
-	bool receiveMessage();
 	void reactToMessage();
 	void endIfNotHTTPRequest();
 	void setMethodInfo();
@@ -37,19 +44,16 @@ private:
 	std::string getFilePath();
 	std::string formAnswer(std::string filePath);
 	void printInfo();
-	void closeConnection();
 
 	sockaddr_in sin;
 	unsigned size;
 	const int sockfd;
-	std::vector<pollfd> fds;
 
 	std::string buffer;
 	std::string query = "";
 	std::string method = "";
 	int contentLength = 0;
 	int contentLeft = 100;
-	int currentFdIndex = 0;
 };
 
 #endif /*HTTPSERVER_H*/
