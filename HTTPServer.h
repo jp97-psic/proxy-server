@@ -24,8 +24,8 @@ public:
 
 protected:
 	virtual void startNewConnection();
-	void closeConnection();
-	bool receiveMessage();
+	virtual void closeConnection();
+	virtual bool receiveMessage();
 
 	const int sockfd;
 
