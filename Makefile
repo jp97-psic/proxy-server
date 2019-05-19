@@ -20,7 +20,7 @@ all: $(APP)
 rebuild: clean $(APP)
 
 $(APP): $(OBJ)
-	$(CXX) $(LFLAGS) $^ -o $@ 
+	$(CXX) $^ -o $@ $(LFLAGS)
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
