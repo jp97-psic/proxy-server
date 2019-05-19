@@ -28,7 +28,6 @@ void HTTPSServer::startNewConnection() {
   }
   else {
     ssl = SSL_new(ctx);
-    std::cout << ssl << std::endl;
     SSL_set_fd(ssl, receiver);
     acceptSSL();
 
