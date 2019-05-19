@@ -23,14 +23,16 @@ void HTTPSServer::startNewConnection() {
   unsigned int client_len = sizeof(client);
 
   int receiver = accept(sockfd, (sockaddr*) &client, &client_len);
-  if(receiver == -1)
+  if(receiver == -1) {
     perror("accept");
-  else
+  }
+  else {
     ssl = SSL_new(ctx);
     SSL_set_fd(ssl, receiver);
     acceptSSL();
 
     fds.push_back({receiver, POLLIN | POLLOUT, 0});
+  }
 }
 
 bool HTTPServer::receiveMessage() {
