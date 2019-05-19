@@ -124,7 +124,7 @@ void HTTPServer::reactToMessage() {
 void HTTPServer::endIfNotHTTPRequest() {
   if(buffer.find("HTTP/") == std::string::npos) {
     std::string answer = "501 Not Implemented";
-    if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1)
+    if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), 0x4000) == -1)
       perror("send");
 
     closeConnection();
@@ -157,7 +157,7 @@ void HTTPServer::printInfo() {
 void HTTPServer::sendResponse() {
   std::string filePath = getFilePath();
   std::string answer = formAnswer(filePath);
-  if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1)
+  if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), 0x4000) == -1)
     perror("send");
   std::cout << "// sent: " << filePath << std::endl << std::endl;
 

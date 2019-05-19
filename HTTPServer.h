@@ -31,7 +31,7 @@ protected:
 
 	std::vector<pollfd> fds;
 	int currentFdIndex = 0;
-
+	std::string buffer;
 
 private:
 	std::vector<char> readFile (const char* path);
@@ -50,7 +50,6 @@ private:
 	sockaddr_in sin;
 	unsigned size;
 
-	std::string buffer;
 	std::string query = "";
 	std::string method = "";
 	int contentLength = 0;
