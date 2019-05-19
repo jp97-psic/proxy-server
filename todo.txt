@@ -1,0 +1,4 @@
+1. obsluga POST i GET bez wysylania rezultatu
+2. obsluga CONNECT
+3. wysylanie rezultatu do POST i GET
+4. 
