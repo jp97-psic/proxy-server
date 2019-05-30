@@ -204,9 +204,6 @@ std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
     exit(1);
   }
 
-  // in_addr *address = (in_addr*) host->h_addr;
-  // std::string ip_address = inet_ntoa(*address);
-
   sockaddr_in sin;
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
@@ -250,7 +247,6 @@ std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
   }
   std::cout << "\r\n// Received: \r\n" << received << "\n";
   return received;
-  // return "HTTP/1.0 200 OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 6\r\n\r\nanswer";
 }
 
 void HTTPServer::connectToServer(std::string hostname) {
