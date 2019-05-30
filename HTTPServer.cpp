@@ -66,9 +66,11 @@ void HTTPServer::handleEvents() {
   for(unsigned i = 0; i < fds.size(); ++i)
     if(fds[i].revents & POLLIN) {
       if(fds[i].fd == sockfd) {
+        std::cout << "started new connection!" << std::endl;
         startNewConnection();
       } else {
         currentFdIndex = i;
+        std::cout << "same old connection" << std::endl;
         if(receiveMessage()) {
           reactToMessage();
         }
@@ -85,7 +87,11 @@ void HTTPServer::startNewConnection() {
   if(receiver == -1) {
     perror("accept");
   } else {
-    fds.push_back({ receiver, POLLIN | POLLOUT, 0 });
+    if(fds.size() < 102) {
+      fds.push_back({ receiver, POLLIN | POLLOUT, 0 });
+    } else {
+      std::cout << "[ERROR] CONNECTIONS LIMIT EXCEDEED" << std::endl << std::endl;
+    }
   }
 }
 
@@ -242,7 +248,7 @@ std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
   int sent = 0;
   while(sent != newQuery.length()) {
     // TODO: ask if it is correct -> pkt 10 -> 1 minuta
-    poll(innerFds.data(), innerFds.size(), 60000);
+    poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLOUT) {
       int status = send(serverSocket, newQuery.data()+sent, newQuery.length()-sent, 0);
