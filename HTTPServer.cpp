@@ -132,7 +132,7 @@ void HTTPServer::reactToMessage() {
   if(endOfRequest()) {
     printInfo();
     if(method == "CONNECT") {
-      std::cout << "Method CONNECT" < std::endl;
+      std::cout << "Method CONNECT" << std::endl;
     } else {
       sendResponse();
     }
