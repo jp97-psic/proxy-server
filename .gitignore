@@ -1,3 +1,7 @@
+# ide
+microsoft.gpg
+.vscode
+
 # Prerequisites
 *.d
 
@@ -30,3 +34,4 @@
 *.exe
 *.out
 *.app
+server
