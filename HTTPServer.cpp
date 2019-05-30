@@ -241,7 +241,8 @@ std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
 
   int sent = 0;
   while(sent != newQuery.length()) {
-    poll(innerFds.data(), innerFds.size(), -1);
+    // TODO: ask if it is correct -> pkt 10 -> 1 minuta
+    poll(innerFds.data(), innerFds.size(), 60000);
 
     if(innerFds[0].revents & POLLOUT) {
       int status = send(serverSocket, newQuery.data()+sent, newQuery.length()-sent, 0);
