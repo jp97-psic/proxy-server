@@ -1,27 +1,48 @@
-CXX=g++
-CXXFLAGS = -g -Wall -std=c++17
+CXX = g++
+CXXFLAGS = -g -Wall -Wextra -pedantic -O0 $(GXX_FLAGS)
+CXXFLAGS += -std=c++11
+
+DEP_FLAGS = -MMD -MP
+
+CXXFLAGS += $(DEP_FLAGS)
 
 SRC = $(wildcard *.cpp)
+HDR = $(wildcard *.h)
 OBJ = $(SRC:.cpp=.o)
 DEP = $(SRC:.cpp=.d)
 
-DEP_FLAGS=-MMD -MP
-CXXFLAGS+=$(DEP_FLAGS)
+APP = server
+ZIP = $(APP).tgz
 
-all: server.exe
+all: $(APP)
 
-server.exe: HTTPServer.o server.o
-	$(CXX) $(CXXFLAGS) $^ -o $@
+rebuild: clean $(APP)
 
-run: server.exe
-	./server.exe
+$(APP): $(OBJ)
+	$(CXX) $^ -o $@ 
 
-val: server.exe
-	valgrind --leak-check=full ./server.exe
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-clean:
-	rm -f *.o *.d server.exe
+zip: $(SRC) $(HDR)
+	tar czf $(ZIP) $^ makefile
 
-.PHONY: all run val clean
+run: $(APP)
+	@./$(APP)
+
+crun: $(APP)
+	@clear
+	@./$(APP)
+
+valgrind: $(APP)
+	@valgrind --leak-check=full ./$(APP)
+
+gdb: $(APP)
+	@gdb ./$(APP)
+
+clean: 
+	@rm -f $(APP) $(OBJ) $(DEP)
+
+.PHONY: all rebuild zip run crun valgrind gdb clean plot
 
 -include $(DEP)
