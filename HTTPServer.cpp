@@ -249,7 +249,7 @@ std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
     poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLOUT) {
-      int status = send(serverSocket, newQuery.data()+sent, newQuery.length()-sent, 0);
+      int status = send(serverSocket, newQuery.data() + sent, newQuery.length() - sent, 0);
       if(status == -1) {
         perror("send");
       } else {
