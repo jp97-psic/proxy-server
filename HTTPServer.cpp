@@ -58,7 +58,7 @@ void HTTPServer::serve() {
 }
 
 void HTTPServer::handleEvents() {
-  if(poll(fds.data(), fds.size(), -1) == -1) {
+  if(poll(fds.data(), fds.size(), 60000) == -1) {
     perror("poll");
     return;
   }
@@ -187,8 +187,7 @@ void HTTPServer::sendResponse() {
   if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
     perror("send");
   }
-    
-  std::cout << "RESPONSE BODY: \n" << filePath << std::endl << std::endl;
+  // std::cout << "RESPONSE BODY: \n" << answer << std::endl << std::endl;
 
   closeConnection();
   query = "";  
@@ -247,7 +246,6 @@ std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
 
   int sent = 0;
   while(sent != newQuery.length()) {
-    // TODO: ask if it is correct -> pkt 10 -> 1 minuta
     poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLOUT) {
@@ -279,6 +277,7 @@ void HTTPServer::connectToServer(std::string hostname) {
 }
 
 void HTTPServer::closeConnection() {
+  std::cout << "Connection " << currentFdIndex << " closed GOODBYE!" << std::endl;
   close(fds[currentFdIndex].fd);
   fds.erase(fds.begin() + currentFdIndex);
   query = "";
