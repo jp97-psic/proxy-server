@@ -70,7 +70,15 @@ void HTTPServer::handleEvents() {
         startNewConnection();
       } else {
         currentFdIndex = i;
+
         std::cout << "same old connection" << std::endl;
+
+        Connection conn = findConnection(fds[i].fd);
+        conn.hande();
+
+        // jezeli zapytanie od klienta otrzymane, to zaczac rozmowe z serwerem 
+
+        // dane od/do klienta albo dane od/do serwera
         if(receiveMessage()) {
           reactToMessage();
         }
@@ -89,6 +97,7 @@ void HTTPServer::startNewConnection() {
   } else {
     if(fds.size() < 102) {
       fds.push_back({ receiver, POLLIN, 0 });
+      connections.push_back({ receiver });
     } else {
       // # define limit 100
       // # define system 1 our socket
@@ -213,39 +222,9 @@ std::string HTTPServer::getFilePath(std::string hostname) {
 }
 
 std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
-  serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-  if(serverSocket == -1) {
-    perror("socket");
-    exit(1);
-  }
+  
 
-  int option = 1;
-  setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option)); 
-
-  int flags = fcntl(serverSocket, F_GETFL);
-  flags |= O_NONBLOCK;
-  fcntl(serverSocket, F_SETFL, flags);
-
-  hostent *host = gethostbyname(hostname.data());
-  if(host == NULL) {
-    printf("%s is unavailable\n", hostname.data());
-    exit(1);
-  }
-
-  sockaddr_in sin;
-  memset(&sin, 0, sizeof(sin));
-  sin.sin_family = AF_INET;
-  // TODO: add https 443
-  sin.sin_port = htons(80);
-  sin.sin_addr.s_addr = inet_addr(inet_ntoa(*(in_addr*) (host -> h_addr_list[0])));
-
-  if(connect(serverSocket, (sockaddr*) &sin, sizeof(sin)) == -1 && errno != 115) {
-    perror("connect");
-    exit(1);
-  }
-
-  std::vector<pollfd> innerFds;
-  innerFds.push_back({ serverSocket, POLLOUT });
+  fds.push_back({ serverSocket, POLLOUT });
 
   std::string newQuery = method + " " + filePath + query.substr(query.find(" HTTP/"));
   std::cout << "New query: " << newQuery << std::endl;

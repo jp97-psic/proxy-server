@@ -10,6 +10,8 @@
 #include <cstring>
 #include <string>
 
+#include "Connection.h"
+
 class HTTPServer {
 public:
 	HTTPServer();
@@ -44,14 +46,8 @@ private:
 	unsigned size;
 	const int sockfd;
 	std::vector<pollfd> fds;
+	std::vector<Connection> connections;
 
-	int serverSocket;
-
-	std::string buffer;
-	std::string query = "";
-	std::string method = "";
-	int contentLength = 0;
-	int contentLeft = 100;
 	int currentFdIndex = 0;
 };
 
