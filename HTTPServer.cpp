@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <netdb.h>
+#include <algorithm>
 
 #define DEBUG 1
 
@@ -63,27 +64,46 @@ void HTTPServer::handleEvents() {
     return;
   }
 
-  for(unsigned i = 0; i < fds.size(); ++i)
-    if(fds[i].revents & POLLIN) {
-      if(fds[i].fd == sockfd) {
+  for(currentFdIndex = 0; currentFdIndex < fds.size(); ++currentFdIndex)
+  {
+    if(fds[currentFdIndex].fd == sockfd) {
+      if(fds[currentFdIndex].revents & POLLIN) {
         std::cout << "started new connection!" << std::endl;
         startNewConnection();
-      } else {
-        currentFdIndex = i;
-
-        std::cout << "same old connection" << std::endl;
-
-        Connection conn = findConnection(fds[i].fd);
-        conn.hande();
-
-        // jezeli zapytanie od klienta otrzymane, to zaczac rozmowe z serwerem 
-
-        // dane od/do klienta albo dane od/do serwera
-        if(receiveMessage()) {
-          reactToMessage();
-        }
       }
+      return;
     }
+    
+    Connection connection = findConnection();
+
+    if(connection.isTimeExceeded()) {
+      closeConnection();
+      return;
+    }
+
+    if(fds[currentFdIndex].revents & POLLIN) {
+      std::cout << "same old connection" << std::endl;
+      connection.handleIncoming();
+      return;
+    }
+
+    if(connection.hasDataToSend() && (fds[currentFdIndex].revents & POLLOUT)) {
+      connection.sendData();
+      return;
+    }
+  }
+}
+
+Connection& HTTPServer::findConnection() {
+  auto iterator = find_if(connections.begin(), connections.end(),
+    [=](Connection c) { c.getIncomingSocket == fds[i].fd; });
+
+  // if (iterator == connections.end()) {
+  //   std::cerr << "connection couldn't be found!";
+  //   return;
+  // }
+
+  return *iterator;
 }
 
 void HTTPServer::startNewConnection() {
@@ -107,156 +127,6 @@ void HTTPServer::startNewConnection() {
   }
 }
 
-bool HTTPServer::receiveMessage() {
-  buffer.resize(100);
-
-  int received = recv(fds[currentFdIndex].fd, const_cast<char*>(buffer.data()), buffer.length(), 0);
-  if(received == -1) {
-    perror("recv");
-    return false;
-  }
-
-  if(received == 0) {
-    closeConnection();
-    return false;
-  }
-
-  // if(received > 8096) {
-  //   // # define 
-  //   std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
-  //   std::string answer = "HTTP/1.0 413 Payload Too Large \r\n\r\n";
-  //   if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-  //     perror("send");
-  //   }
-  //   closeConnection();
-  //   return false;
-  // }
-
-  buffer.resize(received);
-  return true;
-}
-
-void HTTPServer::reactToMessage() {
-  if(query.empty()) {
-    endIfNotHTTPRequest();
-    setMethodInfo();
-  }
-
-  query += buffer;
-
-  // check 8096
-
-  if(endOfHeader()) {
-    setContentInfo();
-  }
-
-  if(endOfRequest()) {
-    printInfo();
-    if(method == "CONNECT") {
-      std::cout << "Method CONNECT" << std::endl;
-    } else {
-      sendResponse();
-    }
-  }
-}
-
-void HTTPServer::endIfNotHTTPRequest() {
-  if(buffer.find("HTTP/") == std::string::npos) {
-    std::string answer = "HTTP/1.0  501 Not Implemented \r\n\r\n";
-    if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-      perror("send");
-    }
-    closeConnection();
-    query = "";  
-  }
-}
-
-void HTTPServer::setMethodInfo() {
-  method = buffer.substr(0, buffer.find(" "));
-}
-
-void HTTPServer::setContentInfo() {
-  if(contentLength == 0) { // contentLength variable not set yet
-    std::string lengthStr = query.substr(query.find("Content-Length") + 16);
-    lengthStr = lengthStr.substr(0, lengthStr.find("\r\n"));
-    contentLength = std::atoi(lengthStr.c_str());
-    std::cout << "Received Content-Length = " << contentLength << std::endl;
-  }
-
-  int contentReceived = query.length() - query.find("\r\n\r\n") - 4;
-  contentLeft = contentLength - contentReceived;
-}
-
-void HTTPServer::printInfo() {
-  std::cout << "REQUEST HEADER: \n" << query.substr(0, query.find("\r\n\r\n")) << std::endl;
-  if(method == "POST") {
-    std::string content = query.substr(query.find("\r\n\r\n") + 4);
-    std::cout << "REQUEST BODY: \n" << content << std::endl;
-  }
-}
-
-void HTTPServer::sendResponse() {
-  std::string hostname = getHostname();
-  std::string filePath = getFilePath(hostname);
-  std::string answer = getAnswer(hostname, filePath);
-  if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-    perror("send");
-  }
-  // std::cout << "RESPONSE BODY: \n" << answer << std::endl << std::endl;
-
-  closeConnection();
-  query = "";  
-}
-
-std::string HTTPServer::getHostname() {
-  std::string hostname = query.substr(query.find("Host") + 4 + 2);
-  hostname = hostname.substr(0, hostname.find("\r\n"));
-  return hostname;
-}
-
-std::string HTTPServer::getFilePath(std::string hostname) {
-  int begin = query.find(hostname) + hostname.length();
-  int length = query.find("HTTP/") - begin - 1;
-  std::string filePath = query.substr(begin, length);
-  return filePath;
-}
-
-std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
-  
-
-  fds.push_back({ serverSocket, POLLOUT });
-
-  std::string newQuery = method + " " + filePath + query.substr(query.find(" HTTP/"));
-  std::cout << "New query: " << newQuery << std::endl;
-
-  int sent = 0;
-  while(sent != newQuery.length()) {
-    poll(innerFds.data(), innerFds.size(), -1);
-
-    if(innerFds[0].revents & POLLOUT) {
-      int status = send(serverSocket, newQuery.data() + sent, newQuery.length() - sent, 0);
-      if(status == -1) {
-        perror("send");
-      } else {
-        sent += status;
-      }
-    }
-  }
-  
-  std::string received = "";
-  while(received.find("\r\n\r\n") == std::string::npos) {
-    poll(innerFds.data(), innerFds.size(), -1);
-
-    if(innerFds[0].revents & POLLIN) {
-      received.resize(100000);
-      int status = recv(serverSocket, const_cast<char*>(received.data()), received.length(), 0);
-      received.resize(status);
-    }
-  }
-  std::cout << "\nRESPONSE received as client: \n" << received << "\n";
-  return received;
-}
-
 void HTTPServer::connectToServer(std::string hostname) {
 
 }
@@ -264,7 +134,9 @@ void HTTPServer::connectToServer(std::string hostname) {
 void HTTPServer::closeConnection() {
   std::cout << "Connection " << currentFdIndex << " closed GOODBYE!" << std::endl;
   close(fds[currentFdIndex].fd);
+
   fds.erase(fds.begin() + currentFdIndex);
+  connections.erase(findConnection());
   query = "";
   contentLength = 0;
   contentLeft = 100;

@@ -1,66 +1,65 @@
-#ifndef HTTPSERVER_H
-#define HTTPSERVER_H
+#pragma once
 
-#include "HTTPServer.h"
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <fcntl.h>
 #include <stdio.h>
 #include <netdb.h>
+#include <chrono>
 
 class Connection {
 public:
-	Connection(int s) : clientSocket(s)
-	{
+	Connection(int s) : clientSocket(s)	{
+		lastOperation = std::chrono::system_clock::now();
 	};
 
-	startConnectionWithServer() {
-		serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	  if(serverSocket == -1) {
-	    perror("socket");
-	    exit(1);
-	  }
+	void startConnectionWithServer();
+	void handleIncoming();
 
-	  int option = 1;
-	  setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option)); 
-
-	  int flags = fcntl(serverSocket, F_GETFL);
-	  flags |= O_NONBLOCK;
-	  fcntl(serverSocket, F_SETFL, flags);
-
-	  hostent *host = gethostbyname(hostname.data());
-	  if(host == NULL) {
-	    printf("%s is unavailable\n", hostname.data());
-	    exit(1);
-	  }
-
-	  sockaddr_in sin;
-	  memset(&sin, 0, sizeof(sin));
-	  sin.sin_family = AF_INET;
-	  // TODO: add https 443
-	  sin.sin_port = htons(80);
-	  sin.sin_addr.s_addr = inet_addr(inet_ntoa(*(in_addr*) (host -> h_addr_list[0])));
-
-	  if(connect(serverSocket, (sockaddr*) &sin, sizeof(sin)) == -1 && errno != 115) {
-	    perror("connect");
-	    exit(1);
-	  }
-	}
+	int getIncomingSocket() {	return fromClient ? clientSocket : serverSocket; }
 
 private:
+	void handleIncomingFromClient();
+	void handleIncomingFromServer();
+	bool receiveRequest();
+	void reactToRequest();
+	void endIfNotHTTPRequest();
+	void setMethodInfo();
+	bool endOfRequest() { return (method != "POST" && data.find("\r\n\r\n") != std::string::npos) || (method == "POST" && dataProcessed == dataToProcess); }
+	bool endOfPostHeader() { return method == "POST" && data.find("\r\n\r\n") != std::string::npos; }
+	void setContentInfo();
+	void printInfo();
+
+	void sendResponse();
+	void setHostnameFromRequest();
+	void setFilePathFromRequest();
+
+	void beginCommunicationWithServer();
+	void sendRequest();
+	void receiveResponse();
+
+	bool isTimeExceeded();
+
+	// void currentSocket();
+
 	int serverSocket;
 	int clientSocket;
 
 	bool fromClient = true;
+	// bool receiving = true;
 
 	std::string buffer;
-	std::string query = "";
+	int dataToProcess = 0;
+	int dataProcessed = 0;
+
+	std::string data = "";
 	std::string method = "";
-	int contentLength = 0;
-	int contentLeft = 100;
+
+	std::string hostname;
+	std::string filePath;
+
+	std::chrono::time_point<std::chrono::system_clock> lastOperation;
 
 	long long lastTimestamp;
 };
-
-#endif

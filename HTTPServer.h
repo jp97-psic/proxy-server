@@ -25,22 +25,9 @@ private:
 	std::vector<char> readFile (const char* path);
 	void handleEvents();
 	void startNewConnection();
-	bool receiveMessage();
-	void reactToMessage();
-	void endIfNotHTTPRequest();
-	void setMethodInfo();
-	bool endOfRequest() { return (method != "POST" && query.find("\r\n\r\n") != std::string::npos) || (method == "POST" && contentLeft == 0); }
-	bool endOfHeader() { return method == "POST" && query.find("\r\n\r\n") != std::string::npos; }
-	void setContentInfo();
-	void sendResponse();
-	std::string getHostname();
-	std::string getFilePath(std::string host);
-	std::string formAnswer(std::string filePath);
-	std::string getAnswer(std::string host, std::string filePath);
-	void printInfo();
 	void closeConnection();
-
 	void connectToServer(std::string);
+	Connection& findConnection(int incomingFd);
 
 	sockaddr_in sin;
 	unsigned size;
