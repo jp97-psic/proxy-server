@@ -58,7 +58,7 @@ void HTTPServer::serve() {
 }
 
 void HTTPServer::handleEvents() {
-  if(poll(fds.data(), fds.size(), 60000) == -1) {
+  if(poll(fds.data(), fds.size(), 1000) == -1) {
     perror("poll");
     return;
   }
@@ -88,8 +88,11 @@ void HTTPServer::startNewConnection() {
     perror("accept");
   } else {
     if(fds.size() < 102) {
-      fds.push_back({ receiver, POLLIN | POLLOUT, 0 });
+      fds.push_back({ receiver, POLLIN, 0 });
     } else {
+      // # define limit 100
+      // # define system 1 our socket
+      // respond wit 500
       std::cout << "[ERROR] CONNECTIONS LIMIT EXCEDEED" << std::endl << std::endl;
     }
   }
@@ -109,15 +112,16 @@ bool HTTPServer::receiveMessage() {
     return false;
   }
 
-  if(received > 8000) {
-    std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
-    std::string answer = "HTTP/1.0 413 Payload Too Large \r\n\r\n";
-    if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-      perror("send");
-    }
-    closeConnection();
-    return false;
-  }
+  // if(received > 8096) {
+  //   // # define 
+  //   std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
+  //   std::string answer = "HTTP/1.0 413 Payload Too Large \r\n\r\n";
+  //   if(send(fds[currentFdIndex].fd, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
+  //     perror("send");
+  //   }
+  //   closeConnection();
+  //   return false;
+  // }
 
   buffer.resize(received);
   return true;
@@ -130,6 +134,8 @@ void HTTPServer::reactToMessage() {
   }
 
   query += buffer;
+
+  // check 8096
 
   if(endOfHeader()) {
     setContentInfo();
@@ -239,7 +245,7 @@ std::string HTTPServer::getAnswer(std::string hostname, std::string filePath) {
   }
 
   std::vector<pollfd> innerFds;
-  innerFds.push_back({ serverSocket, POLLOUT | POLLIN });
+  innerFds.push_back({ serverSocket, POLLOUT });
 
   std::string newQuery = method + " " + filePath + query.substr(query.find(" HTTP/"));
   std::cout << "New query: " << newQuery << std::endl;
