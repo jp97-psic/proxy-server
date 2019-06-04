@@ -82,9 +82,16 @@ void Connection::reactToMessage() {
 
     if(method == "CONNECT") {
       std::cout << "Method CONNECT" << std::endl;
-      beginCommunicationWithServer();
-      sendRequest();
-      //receiveResponse(); // tutaj problem 
+      setDataFromMessage();
+      if(connectWithServer()) {
+        message = "200 OK \r\n\r\n";
+      } else {
+        message = "502 Bad Gateway \r\n\r\n";
+      }
+      dataToProcess = message.length();
+      dataProcessed = 0;
+      sending = true;
+      fromClient = false;
     }
     else {
       beginCommunicationWithServer();
@@ -141,24 +148,23 @@ void Connection::beginCommunicationWithServer() {
 
 void Connection::setDataFromMessage() {
   hostname = message.substr(message.find("Host") + 4 + 2);
-  hostname = hostname.substr(0, hostname.find("\r\n"));
-  
-  int begin = message.find(hostname) + hostname.length();
-  int length = message.find("HTTP/") - begin - 1;
-  filePath = message.substr(begin, length);
+  hostname = hostname.substr(0, hostname.find("\r\n"));  
+
   if(method == "CONNECT") {
     isHttps = message.find(":443") != std::string::npos;
     if(isHttps) {
       hostname = hostname.substr(0, hostname.find(":443"));
-      filePath = hostname;
     }
   } else {
     isHttps = message.find(method + " https://") != std::string::npos;
+    int begin = message.find(hostname) + hostname.length();
+    int length = message.find("HTTP/") - begin - 1;
+    filePath = message.substr(begin, length);
+    dataToProcess = message.length();
   }
-  dataToProcess = message.length();
 }
 
-void Connection::connectWithServer() {
+bool Connection::connectWithServer() {
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if(serverSocket == -1) {
     perror("socket");
@@ -192,8 +198,9 @@ void Connection::connectWithServer() {
 
   if(connect(serverSocket, (sockaddr*) &sin, sizeof(sin)) == -1 && errno != 115) {
     perror("connect");
-    exit(1);
+    return false;
   }
+  return true;
 }
 
 void Connection::sendRequest() {

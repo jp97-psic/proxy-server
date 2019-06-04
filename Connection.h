@@ -37,7 +37,7 @@ private:
 	bool endOfRequest() { return (method != "POST" && message.find("\r\n\r\n") != std::string::npos) || (method == "POST" && dataProcessed == dataToProcess); }
 	bool endOfHeader() { return method == "POST" && message.find("\r\n\r\n") != std::string::npos; }
 
-    void connectWithServer();
+    bool connectWithServer();
 	void beginCommunicationWithServer();
 	void setDataFromMessage();
     void sendRequest();
