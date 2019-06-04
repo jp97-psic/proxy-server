@@ -82,6 +82,9 @@ void Connection::reactToMessage() {
 
     if(method == "CONNECT") {
       std::cout << "Method CONNECT" << std::endl;
+      beginCommunicationWithServer();
+      sendRequest();
+      //receiveResponse(); // tutaj problem 
     }
     else {
       beginCommunicationWithServer();
@@ -132,7 +135,6 @@ void Connection::beginCommunicationWithServer() {
   connectWithServer();
 
   message = method + " " + filePath + message.substr(message.find(" HTTP/"));
-  dataToProcess = message.length();
   dataProcessed = 0;
   sending = true;
 }
@@ -144,12 +146,16 @@ void Connection::setDataFromMessage() {
   int begin = message.find(hostname) + hostname.length();
   int length = message.find("HTTP/") - begin - 1;
   filePath = message.substr(begin, length);
-
-  if(method=="CONNECT")
+  if(method == "CONNECT") {
     isHttps = message.find(":443") != std::string::npos;
-  else {
+    if(isHttps) {
+      hostname = hostname.substr(0, hostname.find(":443"));
+      filePath = hostname;
+    }
+  } else {
     isHttps = message.find(method + " https://") != std::string::npos;
   }
+  dataToProcess = message.length();
 }
 
 void Connection::connectWithServer() {
@@ -199,6 +205,7 @@ void Connection::sendRequest() {
     poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLOUT) {
+      std::cout << "I am sending this ===> \n" << message << std::endl;
       int status = send(serverSocket, message.data() + sent, message.length() - sent, MSG_NOSIGNAL);
       if(status == -1) {
         perror("send");
@@ -224,7 +231,7 @@ void Connection::receiveResponse() {
       buffer.resize(100000);
       int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
       buffer.resize(status);
-
+      std::cout << "otrzymalem to => \n" << recv << std::endl;
       // if(message.empty()) { // beginning of communication
       //   setMethodInfo();
       // }
