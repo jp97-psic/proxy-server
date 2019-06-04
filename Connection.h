@@ -11,46 +11,56 @@
 
 #include <vector>
 #include <string>
+#include <chrono>
 
 class Connection {
 public:
     Connection(int socket);
 
-    int getIncomingSocket() {
-        return fromClient ? clientSocket : serverSocket;
-    }
-
+    int getIncomingSocket() { return fromClient ? clientSocket : serverSocket; }
+    int getOutcomingSocket() { return fromClient ? serverSocket : clientSocket; }
     void handleIncoming();
-
+    void handleOutcoming();
     bool isEnded() { return end; }
+    bool isTimeExceeded();
 
 private:
-	bool receiveMessage();
+    void resetData();
+
+	bool receiveRequest();
 	void reactToMessage();
 	void printInfo();
 
-	void endIfNotHTTPRequest();
+	bool endIfNotHTTPRequest();
 	void setMethodInfo();
 	void setContentInfo();
-	bool endOfRequest() { return (method != "POST" && query.find("\r\n\r\n") != std::string::npos) || (method == "POST" && contentLeft == 0); }
-	bool endOfHeader() { return method == "POST" && query.find("\r\n\r\n") != std::string::npos; }
+	bool endOfRequest() { return (method != "POST" && message.find("\r\n\r\n") != std::string::npos) || (method == "POST" && dataProcessed == dataToProcess); }
+	bool endOfHeader() { return method == "POST" && message.find("\r\n\r\n") != std::string::npos; }
 
+    void connectWithServer();
+	void beginCommunicationWithServer();
+	void setDataFromMessage();
+    void sendRequest();
+	void receiveResponse();
 	void sendResponse();
-	std::string getHostname();
-	std::string getFilePath(std::string host);
-	std::string formAnswer(std::string filePath);
-	std::string getAnswer(std::string host, std::string filePath);
     
     int serverSocket;
     int clientSocket;
 
     bool fromClient = true;
+    bool sending = false;
+    
+	std::chrono::time_point<std::chrono::system_clock> lastTimestamp;
 
 	std::string buffer;
-    std::string query = "";
+    std::string message = "";
     std::string method = "";
-    int contentLength = 0;
-    int contentLeft = 100;
+
+    std::string hostname = "";
+    std::string filePath = "";
+
+    int dataToProcess = 0; // also content size
+    int dataProcessed = -1; // also content received
 
     bool end = false;
 };

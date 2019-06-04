@@ -26,23 +26,16 @@ private:
 	void handleEvents();
 	void startNewConnection();
 	void closeConnection();
-	Connection& findConnectionForIncoming();
+	Connection& findConnection();
 
 	void connectToServer(std::string);
 
 	sockaddr_in sin;
-	unsigned size;
 	const int proxySocket;
 	std::vector<pollfd> sockets;
 	std::vector<Connection> connections;
 
-	std::string buffer;
-	int fdIndex = 0;
-	
-	std::string query = "";
-	std::string method = "";
-	int contentLength = 0;
-	int contentLeft = 100;
+	unsigned fdIndex = 0;
 };
 
 #endif /*HTTPSERVER_H*/

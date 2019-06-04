@@ -7,8 +7,6 @@
 #include <netdb.h>
 #include <algorithm>
 
-#define DEBUG 1
-
 ProxyServer::ProxyServer() : proxySocket(socket(AF_INET, SOCK_STREAM, 0)) {
   if(proxySocket == -1) {
     perror("socket");
@@ -64,28 +62,51 @@ void ProxyServer::handleEvents() {
     return;
   }
 
-  for(fdIndex = 0; fdIndex < sockets.size(); ++fdIndex)
-    if(sockets[fdIndex].revents & POLLIN) {
-      if(sockets[fdIndex].fd == proxySocket) {
-        std::cout << "started new connection!" << std::endl;
+  for(fdIndex = 0; fdIndex < sockets.size(); ++fdIndex) {
+    if(sockets[fdIndex].fd == proxySocket) {
+      if(sockets[fdIndex].revents & POLLIN) {
         startNewConnection();
-      } else {
-        Connection connection = findConnectionForIncoming();
-        connection.handleIncoming();
-        if(connection.isEnded())
-          closeConnection();
       }
     }
+    else {
+      Connection& connection = findConnection();
+      
+      // if(connection.isTimeExceeded()) {
+      //   closeConnection();
+      // }
+      
+      if(sockets[fdIndex].revents & POLLIN) {
+        connection.handleIncoming();
+      }
+      // else if(sockets[fdIndex].revents & POLLOUT) {
+      //   connection.handleOutcoming();
+      // }
+
+      if(connection.isEnded())
+        closeConnection();
+    }
+  }
 }
 
-Connection& ProxyServer::findConnectionForIncoming() {
-  auto iterator = find_if(connections.begin(), connections.end(),
+Connection& ProxyServer::findConnection() {
+  auto it = find_if(connections.begin(), connections.end(),
     [=](Connection c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
+  
+  if(it == connections.end()) {
+    it = find_if(connections.begin(), connections.end(),
+    [=](Connection c) { return c.getOutcomingSocket() == sockets[fdIndex].fd; });
+  }
 
-  return *iterator;
+  return *it;
 }
 
 void ProxyServer::startNewConnection() {
+  if(connections.size() > 99) {
+    std::cout << "[ERROR] CONNECTIONS LIMIT EXCEDEED" << std::endl << std::endl;
+    closeConnection();
+    return;
+  }
+
   sockaddr_in client;
   memset(&client, 0, sizeof(client));
   unsigned int client_len = sizeof(client);
@@ -93,13 +114,10 @@ void ProxyServer::startNewConnection() {
   int receiver = accept(proxySocket, (sockaddr*) &client, &client_len);
   if(receiver == -1) {
     perror("accept");
-  } else {
-    if(sockets.size() < 102) {
-      sockets.push_back({ receiver, POLLIN, 0 });
-      connections.push_back(receiver);
-    } else {
-      std::cout << "[ERROR] CONNECTIONS LIMIT EXCEDEED" << std::endl << std::endl;
-    }
+  }
+  else {
+    sockets.push_back({ receiver, POLLIN, 0 });
+    connections.push_back(receiver);
   }
 }
 
@@ -108,13 +126,28 @@ void ProxyServer::connectToServer(std::string hostname) {
 }
 
 void ProxyServer::closeConnection() {
-  std::cout << "Connection " << fdIndex << " closed GOODBYE!" << std::endl;
   close(sockets[fdIndex].fd);
+
   sockets.erase(sockets.begin() + fdIndex);
-  auto connectionIt = find_if(connections.begin(), connections.end(),
+
+  auto it = find_if(connections.begin(), connections.end(),
     [=](Connection c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
-  connections.erase(connectionIt);
-  query = "";
-  contentLength = 0;
-  contentLeft = 100;
+  connections.erase(it);
 }
+
+// Informacja o błędzie:
+
+// Brak wczytania pełnego nagłówka oraz błąd z przetworzeniem ciała:
+
+// REQUEST HEADER:
+// POST http://ocsp.pki.goog/GTSGIAG3 HTTP/1.1
+// Host: ocsp.pki.goog
+// User-Agent: Mozilla/5.0 (Windows N
+
+// REQUEST BODY:
+// T http://ocsp.pki.goog/GTSGIAG3 HTTP/1.1
+// Host: ocsp.pki.goog
+// User-Agent: Mozilla/5.0 (Windows N
+// New message: POST /GTSGIAG3 HTTP/1.1
+// Host: ocsp.pki.goog
+// User-Agent: Mozilla/5.0 (Windows N

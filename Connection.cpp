@@ -7,15 +7,31 @@
 #include <stdio.h>
 #include <netdb.h>
 
-Connection::Connection(int socket) : clientSocket(socket) { }
+bool Connection::isTimeExceeded() {
+  auto now = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = now-lastTimestamp;
+  lastTimestamp = now;
+
+  return elapsed_seconds.count() > 60.0;
+}
+
+Connection::Connection(int socket) : clientSocket(socket) {
+  lastTimestamp = std::chrono::system_clock::now();
+}
+
+void Connection::handleOutcoming() {
+  if(sending && !fromClient) {
+    sendResponse();
+  }
+}
 
 void Connection::handleIncoming() {
-  if(receiveMessage()) {
+  if(receiveRequest()) {
     reactToMessage();
   }
 }
 
-bool Connection::receiveMessage() {
+bool Connection::receiveRequest() {
   buffer.resize(100);
 
   int received = recv(clientSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
@@ -25,31 +41,33 @@ bool Connection::receiveMessage() {
   }
 
   if(received == 0) {
-    end = true;
+    // end = true;
     return false;
   }
 
-  if(received > 8000) {
-    std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
-    std::string answer = "HTTP/1.0 413 Payload Too Large \r\n\r\n";
-    if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-      perror("send");
-    }
-    end = true;
-    return false;
-  }
+  // if(received > 8000) {
+  //   std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
+  //   std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
+  //   if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
+  //     perror("send");
+  //   }
+  //   // end = true;
+  //   return false;
+  // }
 
   buffer.resize(received);
   return true;
 }
 
 void Connection::reactToMessage() {
-  if(query.empty()) {
-    endIfNotHTTPRequest();
+  if(message.empty()) { // beginning of communication
+    if(endIfNotHTTPRequest())
+      return;
+
     setMethodInfo();
   }
 
-  query += buffer;
+  message += buffer;
 
   if(endOfHeader()) {
     setContentInfo();
@@ -57,22 +75,30 @@ void Connection::reactToMessage() {
 
   if(endOfRequest()) {
     printInfo();
+
     if(method == "CONNECT") {
       std::cout << "Method CONNECT" << std::endl;
-    } else {
-      sendResponse();
+    }
+    else {
+      beginCommunicationWithServer();
+      sendRequest();
+      receiveResponse();
     }
   }
 }
 
-void Connection::endIfNotHTTPRequest() {
+bool Connection::endIfNotHTTPRequest() {
   if(buffer.find("HTTP/") == std::string::npos) {
-    std::string answer = "HTTP/1.0  501 Not Implemented \r\n\r\n";
+    std::string answer = "HTTP/1.1  501 Not Implemented\r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
       perror("send");
     }
-    query = "";  
+
+    // end = true;
+    return true;
   }
+
+  return false;
 }
 
 void Connection::setMethodInfo() {
@@ -80,51 +106,43 @@ void Connection::setMethodInfo() {
 }
 
 void Connection::setContentInfo() {
-  if(contentLength == 0) { // contentLength variable not set yet
-    std::string lengthStr = query.substr(query.find("Content-Length") + 16);
+  if(dataToProcess == 0) { // dataToProcess variable not set yet
+    std::string lengthStr = message.substr(message.find("Content-Length") + 16);
     lengthStr = lengthStr.substr(0, lengthStr.find("\r\n"));
-    contentLength = std::atoi(lengthStr.c_str());
-    std::cout << "Received Content-Length = " << contentLength << std::endl;
+    dataToProcess = std::atoi(lengthStr.c_str());
   }
 
-  int contentReceived = query.length() - query.find("\r\n\r\n") - 4;
-  contentLeft = contentLength - contentReceived;
+  dataProcessed = message.length() - message.find("\r\n\r\n") - 4;
 }
 
 void Connection::printInfo() {
-  std::cout << "REQUEST HEADER: \n" << query.substr(0, query.find("\r\n\r\n")) << std::endl;
+  std::cout << "\nREQUEST HEADER: \n" << message.substr(0, message.find("\r\n\r\n")) << std::endl;
   if(method == "POST") {
-    std::string content = query.substr(query.find("\r\n\r\n") + 4);
-    std::cout << "REQUEST BODY: \n" << content << std::endl;
+    std::string content = message.substr(message.find("\r\n\r\n") + 4);
+    std::cout << "\nREQUEST BODY: \n" << content << std::endl;
   }
 }
 
-void Connection::sendResponse() {
-  std::string hostname = getHostname();
-  std::string filePath = getFilePath(hostname);
-  std::string answer = getAnswer(hostname, filePath);
-  
-  if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-    perror("send");
-  }
+void Connection::beginCommunicationWithServer() {
+  setDataFromMessage();
+  connectWithServer();
 
-  query = "";  
+  message = method + " " + filePath + message.substr(message.find(" HTTP/"));
+  dataToProcess = message.length();
+  dataProcessed = 0;
+  sending = true;
 }
 
-std::string Connection::getHostname() {
-  std::string hostname = query.substr(query.find("Host") + 4 + 2);
+void Connection::setDataFromMessage() {
+  hostname = message.substr(message.find("Host") + 4 + 2);
   hostname = hostname.substr(0, hostname.find("\r\n"));
-  return hostname;
+  
+  int begin = message.find(hostname) + hostname.length();
+  int length = message.find("HTTP/") - begin - 1;
+  filePath = message.substr(begin, length);
 }
 
-std::string Connection::getFilePath(std::string hostname) {
-  int begin = query.find(hostname) + hostname.length();
-  int length = query.find("HTTP/") - begin - 1;
-  std::string filePath = query.substr(begin, length);
-  return filePath;
-}
-
-std::string Connection::getAnswer(std::string hostname, std::string filePath) {
+void Connection::connectWithServer() {
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if(serverSocket == -1) {
     perror("socket");
@@ -155,19 +173,18 @@ std::string Connection::getAnswer(std::string hostname, std::string filePath) {
     perror("connect");
     exit(1);
   }
+}
 
+void Connection::sendRequest() {
   std::vector<pollfd> innerFds;
-  innerFds.push_back({ serverSocket, POLLOUT | POLLIN });
-
-  std::string newQuery = method + " " + filePath + query.substr(query.find(" HTTP/"));
-  std::cout << "New query: " << newQuery << std::endl;
+  innerFds.push_back({ serverSocket, POLLOUT, 0 });
 
   int sent = 0;
-  while(sent != newQuery.length()) {
+  while(sent != message.length()) {
     poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLOUT) {
-      int status = send(serverSocket, newQuery.data() + sent, newQuery.length() - sent, 0);
+      int status = send(serverSocket, message.data() + sent, message.length() - sent, 0);
       if(status == -1) {
         perror("send");
       } else {
@@ -175,17 +192,59 @@ std::string Connection::getAnswer(std::string hostname, std::string filePath) {
       }
     }
   }
+
+  fromClient = false;
+  sending = false;
+}
+
+void Connection::receiveResponse() {
+  std::vector<pollfd> innerFds;
+  innerFds.push_back({ serverSocket, POLLIN, 0 });
   
-  std::string received = "";
-  while(received.find("\r\n\r\n") == std::string::npos) {
+  resetData();
+  while(endOfRequest()) {
     poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLIN) {
-      received.resize(100000);
-      int status = recv(serverSocket, const_cast<char*>(received.data()), received.length(), 0);
-      received.resize(status);
+      buffer.resize(100000);
+      int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
+      buffer.resize(status);
+
+      if(message.empty()) { // beginning of communication
+        setMethodInfo();
+      }
+      message += buffer;
     }
   }
-  std::cout << "\nRESPONSE received as client: \n" << received << "\n";
-  return received;
+
+  dataToProcess = message.length();
+  dataProcessed = 0;
+  sending = true;
+}
+
+void Connection::sendResponse() {
+  if(dataProcessed == dataToProcess) {
+    resetData();
+    return;
+  }
+
+  int status = send(serverSocket, message.data() + dataProcessed, message.length() - dataProcessed, 0);
+  if(status == -1) {
+    perror("send");
+  } else {
+    dataProcessed += status;
+  }
+
+  // end = true;
+}
+
+void Connection::resetData() {
+  message = "";
+  method = "";
+
+  hostname = "";
+  filePath = "";
+
+  dataToProcess = 0; // also content size
+  dataProcessed = -1; // also content received
 }
