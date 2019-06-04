@@ -145,6 +145,8 @@ void Connection::setDataFromMessage() {
   int begin = message.find(hostname) + hostname.length();
   int length = message.find("HTTP/") - begin - 1;
   filePath = message.substr(begin, length);
+
+  ifHttps = message.find(":443") == std::string::npos;
 }
 
 void Connection::connectWithServer() {
@@ -167,11 +169,16 @@ void Connection::connectWithServer() {
     exit(1);
   }
 
+  int port = ifHttps ? 443 : 80;
+
+  if(ifHttps) {
+    std::cout << "HTTPS connection" << std::endl;
+  } 
+
   sockaddr_in sin;
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
-  // TODO: add https 443
-  sin.sin_port = htons(80);
+  sin.sin_port = htons(port);
   sin.sin_addr.s_addr = inet_addr(inet_ntoa(*(in_addr*) (host -> h_addr_list[0])));
 
   if(connect(serverSocket, (sockaddr*) &sin, sizeof(sin)) == -1 && errno != 115) {

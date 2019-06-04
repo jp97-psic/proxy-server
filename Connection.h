@@ -55,6 +55,7 @@ private:
 	std::string buffer;
     std::string message = "";
     std::string method = "";
+    bool ifHttps = false;
 
     std::string hostname = "";
     std::string filePath = "";
