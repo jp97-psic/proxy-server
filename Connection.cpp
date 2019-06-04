@@ -13,11 +13,11 @@
 bool Connection::isTimeExceeded() {
   auto now = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = now-lastTimestamp;
-  lastTimestamp = now;
 
   const double timeLimit = 60.0;
 
-  return elapsed_seconds.count() > timeLimit;
+  // return elapsed_seconds.count() > timeLimit;
+  return false;
 }
 
 Connection::Connection(int socket) : clientSocket(socket) {
@@ -31,7 +31,8 @@ void Connection::handleOutcoming() {
 }
 
 void Connection::handleIncoming() {
-  if(receiveRequest()) {
+  if(!sending && fromClient && receiveRequest()) {
+    // lastTimestamp = std::chrono::system_clock::now();
     reactToMessage();
   }
 }
@@ -84,9 +85,9 @@ void Connection::reactToMessage() {
       std::cout << "Method CONNECT" << std::endl;
       setDataFromMessage();
       if(connectWithServer()) {
-        message = "200 OK \r\n\r\n";
+        message = "HTTP/1.1 200 OK \r\n\r\n";
       } else {
-        message = "502 Bad Gateway \r\n\r\n";
+        message = "HTTP/1.1 502 Bad Gateway \r\n\r\n";
       }
       dataToProcess = message.length();
       dataProcessed = 0;
@@ -238,7 +239,6 @@ void Connection::receiveResponse() {
       buffer.resize(100000);
       int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
       buffer.resize(status);
-      std::cout << "otrzymalem to => \n" << recv << std::endl;
       // if(message.empty()) { // beginning of communication
       //   setMethodInfo();
       // }
@@ -248,7 +248,7 @@ void Connection::receiveResponse() {
 
   std::cout << "\nRESPONSE from server:\n" << message << std::endl;
 
-  close(serverSocket);
+  // close(serverSocket);
 
   dataToProcess = message.length();
   dataProcessed = 0;

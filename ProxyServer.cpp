@@ -75,13 +75,16 @@ void ProxyServer::handleEvents() {
       Connection& connection = findConnection();
       
       if(connection.isTimeExceeded()) {
+        std::cout << "Time exceeded\n";
         closeConnection();
+        continue;
       }
       
       if(sockets[fdIndex].revents & POLLIN) { 
         connection.handleIncoming();
       }
-      else if(sockets[fdIndex].revents & POLLOUT) {
+      
+      if(sockets[fdIndex].revents & POLLOUT) {
         connection.handleOutcoming();
       }
 
