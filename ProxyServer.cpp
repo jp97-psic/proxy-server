@@ -57,7 +57,7 @@ void ProxyServer::serve() {
 }
 
 void ProxyServer::handleEvents() {
-  if(poll(sockets.data(), sockets.size(), 60000) == -1) {
+  if(poll(sockets.data(), sockets.size(), -1) == -1) {
     perror("poll");
     return;
   }
