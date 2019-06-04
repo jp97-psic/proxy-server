@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <netdb.h>
 
-
+#define MAX_PAYLOAD 8 * 1024
 
 
 bool Connection::isTimeExceeded() {
@@ -71,15 +71,14 @@ void Connection::reactToMessage() {
   if(endOfRequest()) {
     printInfo();
 
-    // if(buffer.length() > 8096) {
-    //   std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
-    //   std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
-    //   if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-    //     perror("send");
-    //   }
-    //   // end = true;
-    //   // return false;
-    // }
+    if(buffer.length() > MAX_PAYLOAD) {
+      std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
+      std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
+      if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
+        perror("send");
+      }
+      // end = true;
+    }
 
     if(method == "CONNECT") {
       std::cout << "Method CONNECT" << std::endl;
