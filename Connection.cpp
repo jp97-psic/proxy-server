@@ -85,9 +85,15 @@ void Connection::reactToMessage() {
       std::cout << "Method CONNECT" << std::endl;
       setDataFromMessage();
       if(connectWithServer()) {
+<<<<<<< HEAD
         message = "HTTP/1.1 200 OK \r\n\r\n";
       } else {
         message = "HTTP/1.1 502 Bad Gateway \r\n\r\n";
+=======
+        message = "HTTP/1.1 200 OK\r\n\r\n";
+      } else {
+        message = "HTTP/1.1 502 Bad Gateway\r\n\r\n";
+>>>>>>> 623f87cb8cb390365e6dc9569a23cad74006d52e
       }
       dataToProcess = message.length();
       dataProcessed = 0;
@@ -104,7 +110,7 @@ void Connection::reactToMessage() {
 
 bool Connection::endIfNotHTTPRequest() {
   if(buffer.find("HTTP/") == std::string::npos) {
-    std::string answer = "HTTP/1.1  501 Not Implemented\r\n\r\n";
+    std::string answer = "HTTP/1.1 501 Not Implemented\r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
       perror("send");
     }
