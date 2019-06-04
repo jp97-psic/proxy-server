@@ -74,9 +74,9 @@ void ProxyServer::handleEvents() {
     else {
       Connection& connection = findConnection();
       
-      // if(connection.isTimeExceeded()) {
-      //   closeConnection();
-      // }
+      if(connection.isTimeExceeded()) {
+        closeConnection();
+      }
       
       if(sockets[fdIndex].revents & POLLIN) { 
         connection.handleIncoming();
