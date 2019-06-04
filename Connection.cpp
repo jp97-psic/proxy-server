@@ -7,12 +7,17 @@
 #include <stdio.h>
 #include <netdb.h>
 
+
+
+
 bool Connection::isTimeExceeded() {
   auto now = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = now-lastTimestamp;
   lastTimestamp = now;
 
-  return elapsed_seconds.count() > 60.0;
+  const double timeLimit = 60.0;
+
+  return elapsed_seconds.count() > timeLimit;
 }
 
 Connection::Connection(int socket) : clientSocket(socket) {
@@ -45,16 +50,6 @@ bool Connection::receiveRequest() {
     return false;
   }
 
-  // if(received > 8000) {
-  //   std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
-  //   std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
-  //   if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-  //     perror("send");
-  //   }
-  //   // end = true;
-  //   return false;
-  // }
-
   buffer.resize(received);
   return true;
 }
@@ -75,6 +70,16 @@ void Connection::reactToMessage() {
 
   if(endOfRequest()) {
     printInfo();
+
+    // if(buffer.length() > 8096) {
+    //   std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
+    //   std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
+    //   if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
+    //     perror("send");
+    //   }
+    //   // end = true;
+    //   // return false;
+    // }
 
     if(method == "CONNECT") {
       std::cout << "Method CONNECT" << std::endl;
