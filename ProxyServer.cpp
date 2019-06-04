@@ -7,6 +7,9 @@
 #include <netdb.h>
 #include <algorithm>
 
+#define CONNECTION_COUNT_LIMIT 99
+
+
 ProxyServer::ProxyServer() : proxySocket(socket(AF_INET, SOCK_STREAM, 0)) {
   if(proxySocket == -1) {
     perror("socket");
@@ -101,7 +104,7 @@ Connection& ProxyServer::findConnection() {
 }
 
 void ProxyServer::startNewConnection() {
-  if(connections.size() > 99) {
+  if(connections.size() > CONNECTION_COUNT_LIMIT) {
     std::cout << "[ERROR] CONNECTIONS LIMIT EXCEDEED" << std::endl << std::endl;
     closeConnection();
     return;
