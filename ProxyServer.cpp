@@ -78,12 +78,12 @@ void ProxyServer::handleEvents() {
       //   closeConnection();
       // }
       
-      if(sockets[fdIndex].revents & POLLIN) {
+      if(sockets[fdIndex].revents & POLLIN) { 
         connection.handleIncoming();
       }
-      // else if(sockets[fdIndex].revents & POLLOUT) {
-      //   connection.handleOutcoming();
-      // }
+      else if(sockets[fdIndex].revents & POLLOUT) {
+        connection.handleOutcoming();
+      }
 
       if(connection.isEnded())
         closeConnection();
@@ -119,7 +119,7 @@ void ProxyServer::startNewConnection() {
     perror("accept");
   }
   else {
-    sockets.push_back({ receiver, POLLIN, 0 });
+    sockets.push_back({ receiver, POLLIN | POLLOUT, 0 });
     connections.push_back(receiver);
   }
 }

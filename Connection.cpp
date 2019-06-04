@@ -145,7 +145,11 @@ void Connection::setDataFromMessage() {
   int length = message.find("HTTP/") - begin - 1;
   filePath = message.substr(begin, length);
 
-  ifHttps = message.find(":443") == std::string::npos;
+  if(method=="CONNECT")
+    isHttps = message.find(":443") != std::string::npos;
+  else {
+    isHttps = message.find(method + " https://") != std::string::npos;
+  }
 }
 
 void Connection::connectWithServer() {
@@ -168,9 +172,9 @@ void Connection::connectWithServer() {
     exit(1);
   }
 
-  int port = ifHttps ? 443 : 80;
+  int port = isHttps ? 443 : 80;
 
-  if(ifHttps) {
+  if(isHttps) {
     std::cout << "HTTPS connection" << std::endl;
   } 
 
@@ -195,7 +199,7 @@ void Connection::sendRequest() {
     poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLOUT) {
-      int status = send(serverSocket, message.data() + sent, message.length() - sent, 0);
+      int status = send(serverSocket, message.data() + sent, message.length() - sent, MSG_NOSIGNAL);
       if(status == -1) {
         perror("send");
       } else {
@@ -213,7 +217,7 @@ void Connection::receiveResponse() {
   innerFds.push_back({ serverSocket, POLLIN, 0 });
   
   resetData();
-  while(endOfRequest()) {
+  while(!endOfRequest()) {
     poll(innerFds.data(), innerFds.size(), -1);
 
     if(innerFds[0].revents & POLLIN) {
@@ -221,12 +225,16 @@ void Connection::receiveResponse() {
       int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
       buffer.resize(status);
 
-      if(message.empty()) { // beginning of communication
-        setMethodInfo();
-      }
+      // if(message.empty()) { // beginning of communication
+      //   setMethodInfo();
+      // }
       message += buffer;
     }
   }
+
+  std::cout << "\nRESPONSE from server:\n" << message << std::endl;
+
+  close(serverSocket);
 
   dataToProcess = message.length();
   dataProcessed = 0;
@@ -236,10 +244,12 @@ void Connection::receiveResponse() {
 void Connection::sendResponse() {
   if(dataProcessed == dataToProcess) {
     resetData();
+    sending = false;
+    fromClient = true;
     return;
   }
 
-  int status = send(serverSocket, message.data() + dataProcessed, message.length() - dataProcessed, 0);
+  int status = send(clientSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
   if(status == -1) {
     perror("send");
   } else {
