@@ -85,15 +85,9 @@ void Connection::reactToMessage() {
       std::cout << "Method CONNECT" << std::endl;
       setDataFromMessage();
       if(connectWithServer()) {
-<<<<<<< HEAD
         message = "HTTP/1.1 200 OK \r\n\r\n";
       } else {
         message = "HTTP/1.1 502 Bad Gateway \r\n\r\n";
-=======
-        message = "HTTP/1.1 200 OK\r\n\r\n";
-      } else {
-        message = "HTTP/1.1 502 Bad Gateway\r\n\r\n";
->>>>>>> 623f87cb8cb390365e6dc9569a23cad74006d52e
       }
       dataToProcess = message.length();
       dataProcessed = 0;
@@ -262,18 +256,18 @@ void Connection::receiveResponse() {
 }
 
 void Connection::sendResponse() {
-  if(dataProcessed == dataToProcess) {
-    resetData();
-    sending = false;
-    fromClient = true;
-    return;
-  }
-
   int status = send(clientSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
   if(status == -1) {
     perror("send");
   } else {
     dataProcessed += status;
+  }
+  
+  if(dataProcessed == dataToProcess) {
+    resetData();
+    sending = false;
+    fromClient = true;
+    
   }
 
   // end = true;
