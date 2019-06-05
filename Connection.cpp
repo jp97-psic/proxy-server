@@ -142,7 +142,7 @@ void Connection::beginCommunicationWithServer() {
   setDataFromMessage();
   connectWithServer();
 
-  message = method + " " + filePath + message.substr(message.find(" HTTP/"));
+  message = method + " " + filePath + " HTTP/1.0" + message.substr(message.find(" HTTP/")+9);
   dataProcessed = 0;
   sending = true;
 }
