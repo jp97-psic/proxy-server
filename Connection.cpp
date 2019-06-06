@@ -71,7 +71,7 @@ void Connection::handleHTTPRequest() {
   
   if(headerLength > MAX_PAYLOAD) {
     std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
-    std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
+    std::string answer = "HTTP/1.0 413 Payload Too Large \r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
       perror("send/reactToMessage");
     }
@@ -100,10 +100,10 @@ void Connection::handleHTTPRequest() {
 void Connection::handleConnect() {
   setDataFromMessage();
   if(connectWithServer()) {
-    message = "HTTP/1.1 200 OK \r\n\r\n";
+    message = "HTTP/1.0 200 OK \r\n\r\n";
     std::cout << "Connected with server " << serverSocket << std::endl;
   } else {
-    message = "HTTP/1.1 502 Bad Gateway \r\n\r\n";
+    message = "HTTP/1.0 502 Bad Gateway \r\n\r\n";
   }
 
   dataToProcess = message.length();
@@ -118,7 +118,7 @@ void Connection::handleHTTPSRequest() {
 
 bool Connection::endIfDifferentProtocol() {
   if(buffer.find("HTTP/") == std::string::npos) {
-    std::string answer = "HTTP/1.1 501 Not Implemented\r\n\r\n";
+    std::string answer = "HTTP/1.0 501 Not Implemented\r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
       perror("send/endIfDifferentProtocol");
     }

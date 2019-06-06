@@ -142,20 +142,3 @@ void ProxyServer::closeConnection() {
 
   sockets.erase(sockets.begin() + fdIndex);
 }
-
-// Informacja o błędzie:
-
-// Brak wczytania pełnego nagłówka oraz błąd z przetworzeniem ciała:
-
-// REQUEST HEADER:
-// POST http://ocsp.pki.goog/GTSGIAG3 HTTP/1.1
-// Host: ocsp.pki.goog
-// User-Agent: Mozilla/5.0 (Windows N
-
-// REQUEST BODY:
-// T http://ocsp.pki.goog/GTSGIAG3 HTTP/1.1
-// Host: ocsp.pki.goog
-// User-Agent: Mozilla/5.0 (Windows N
-// New message: POST /GTSGIAG3 HTTP/1.1
-// Host: ocsp.pki.goog
-// User-Agent: Mozilla/5.0 (Windows N
