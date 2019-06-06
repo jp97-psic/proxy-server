@@ -16,8 +16,7 @@ bool Connection::isTimeExceeded() {
 
   const double timeLimit = 60.0;
 
-  // return elapsed_seconds.count() > timeLimit;
-  return false;
+  return elapsed_seconds.count() > timeLimit;
 }
 
 Connection::Connection(int socket) : clientSocket(socket) {
@@ -42,7 +41,7 @@ bool Connection::receiveRequest() {
 
   int received = recv(clientSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
   if(received == -1) {
-    perror("recv");
+    perror("recv/receiveRequest");
     return false;
   }
 
@@ -56,7 +55,7 @@ bool Connection::receiveRequest() {
 }
 
 void Connection::reactToMessage() {
-  if(message.empty()) { // beginning of communication
+  if(message.empty() && !isHttps) { // beginning of communication
     if(endIfNotHTTPRequest())
       return;
 
@@ -76,7 +75,7 @@ void Connection::reactToMessage() {
       std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
       std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
       if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-        perror("send");
+        perror("send/reactToMessage");
       }
       // end = true;
     }
@@ -106,10 +105,10 @@ bool Connection::endIfNotHTTPRequest() {
   if(buffer.find("HTTP/") == std::string::npos) {
     std::string answer = "HTTP/1.1 501 Not Implemented\r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-      perror("send");
+      perror("send/endIfNotHTTPRequest");
     }
 
-    // end = true;
+    end = true;
     return true;
   }
 
@@ -131,7 +130,7 @@ void Connection::setContentInfo() {
 }
 
 void Connection::printInfo() {
-  std::cout << "\nREQUEST HEADER: \n" << message.substr(0, message.find("\r\n\r\n")) << std::endl;
+  std::cout << "\nREQUEST HEADER on socket " << clientSocket << ": \n" << message.substr(0, message.find("\r\n\r\n")) << std::endl;
   if(method == "POST") {
     std::string content = message.substr(message.find("\r\n\r\n") + 4);
     std::cout << "\nREQUEST BODY: \n" << content << std::endl;
@@ -168,7 +167,7 @@ void Connection::setDataFromMessage() {
 bool Connection::connectWithServer() {
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if(serverSocket == -1) {
-    perror("socket");
+    perror("socket/connectWithServer");
     exit(1);
   }
 
@@ -198,7 +197,7 @@ bool Connection::connectWithServer() {
   sin.sin_addr.s_addr = inet_addr(inet_ntoa(*(in_addr*) (host -> h_addr_list[0])));
 
   if(connect(serverSocket, (sockaddr*) &sin, sizeof(sin)) == -1 && errno != 115) {
-    perror("connect");
+    perror("connect/connectWithServer");
     return false;
   }
   return true;
@@ -216,7 +215,7 @@ void Connection::sendRequest() {
       std::cout << "I am sending this ===> \n" << message << std::endl;
       int status = send(serverSocket, message.data() + sent, message.length() - sent, MSG_NOSIGNAL);
       if(status == -1) {
-        perror("send");
+        perror("send/sendRequest");
       } else {
         sent += status;
       }
@@ -225,6 +224,11 @@ void Connection::sendRequest() {
 
   fromClient = false;
   sending = false;
+  
+  // part for troubleshooting
+  // if(message.find("Accept: image/webp") != std::string::npos || message.find("Accept: text/css") != std::string::npos)
+  //   std::cout << " :) ";
+        
 }
 
 void Connection::receiveResponse() {
@@ -239,16 +243,15 @@ void Connection::receiveResponse() {
       buffer.resize(100000);
       int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
       buffer.resize(status);
-      // if(message.empty()) { // beginning of communication
-      //   setMethodInfo();
-      // }
       message += buffer;
     }
   }
 
-  std::cout << "\nRESPONSE from server:\n" << message << std::endl;
-
-  // close(serverSocket);
+  std::cout << "\nRESPONSE from server on socket "<< serverSocket << ":\n";
+  if(message.length() > 700)
+    std::cout << message.substr(0,400) << "\n(tu ciąg dalszy)\n" << message.substr(message.length()-200);
+  else
+    std::cout << message;
 
   dataToProcess = message.length();
   dataProcessed = 0;
@@ -258,7 +261,7 @@ void Connection::receiveResponse() {
 void Connection::sendResponse() {
   int status = send(clientSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
   if(status == -1) {
-    perror("send");
+    perror("send/sendResponse");
   } else {
     dataProcessed += status;
   }

@@ -28,8 +28,6 @@ private:
 	void closeConnection();
 	Connection& findConnection();
 
-	void connectToServer(std::string);
-
 	sockaddr_in sin;
 	const int proxySocket;
 	std::vector<pollfd> sockets;

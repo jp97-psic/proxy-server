@@ -21,11 +21,14 @@ ProxyServer::ProxyServer() : proxySocket(socket(AF_INET, SOCK_STREAM, 0)) {
 }
 
 ProxyServer::~ProxyServer() {
-	close(proxySocket);
+  for(Connection& conn: connections) {
+    std::cout << "Closing connection " << conn.getIncomingSocket() << "->" << conn.getOutcomingSocket() << std::endl;
 
-  for(auto& fd: sockets) {
-    close(fd.fd);
+    close(conn.getIncomingSocket());
+    close(conn.getOutcomingSocket());
   }
+
+	close(proxySocket);
 }
 
 void ProxyServer::makeNonBlocking() {
@@ -96,12 +99,13 @@ void ProxyServer::handleEvents() {
 
 Connection& ProxyServer::findConnection() {
   auto it = find_if(connections.begin(), connections.end(),
-    [=](Connection c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
+    [=](Connection& c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
   
-  if(it == connections.end()) {
-    it = find_if(connections.begin(), connections.end(),
-    [=](Connection c) { return c.getOutcomingSocket() == sockets[fdIndex].fd; });
-  }
+  // not needed now, because we deal only with client in this class
+  // if(it == connections.end()) {
+  //   it = find_if(connections.begin(), connections.end(),
+  //   [=](Connection& c) { return c.getOutcomingSocket() == sockets[fdIndex].fd; });
+  // }
 
   return *it;
 }
@@ -123,22 +127,21 @@ void ProxyServer::startNewConnection() {
   }
   else {
     sockets.push_back({ receiver, POLLIN | POLLOUT, 0 });
-    connections.push_back(receiver);
+    connections.emplace_back(receiver);
   }
 }
 
-void ProxyServer::connectToServer(std::string hostname) {
-
-}
-
 void ProxyServer::closeConnection() {
-  close(sockets[fdIndex].fd);
+  auto it = find_if(connections.begin(), connections.end(),
+    [=](Connection& c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
+    
+  std::cout << "Closing connection " << it->getIncomingSocket() << "->" << it->getOutcomingSocket() << std::endl;
+
+  close(it->getIncomingSocket());
+  close(it->getOutcomingSocket());
+  connections.erase(it);
 
   sockets.erase(sockets.begin() + fdIndex);
-
-  auto it = find_if(connections.begin(), connections.end(),
-    [=](Connection c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
-  connections.erase(it);
 }
 
 // Informacja o błędzie:
