@@ -32,7 +32,10 @@ void Connection::handleOutcoming() {
 
 void Connection::handleIncoming() {
   if(!sending && fromClient && receiveRequest()) {
-    reactToMessage();
+    if(isHttps)
+      handleHTTPSRequest();
+    else
+      handleHTTPRequest();
     lastTimestamp = std::chrono::system_clock::now();
   }
 }
@@ -47,7 +50,6 @@ bool Connection::receiveRequest() {
   }
 
   if(received == 0) {
-    // end = true;
     return false;
   }
 
@@ -55,44 +57,37 @@ bool Connection::receiveRequest() {
   return true;
 }
 
-void Connection::reactToMessage() {
-  if(message.empty() && !isHttps) { // beginning of communication
-    if(endIfNotHTTPRequest())
+void Connection::handleHTTPRequest() {
+  if(message.empty()) {
+    if(endIfDifferentProtocol())
       return;
-
     setMethodInfo();
   }
 
   message += buffer;
 
-  if(endOfHeader()) {
+  int endOfHeader = message.find("\r\n\r\n");
+  int headerLength = (endOfHeader != std::string::npos) ? endOfHeader : message.length();
+  
+  if(headerLength > MAX_PAYLOAD) {
+    std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
+    std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
+    if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
+      perror("send/reactToMessage");
+    }
+    end = true;
+    return;
+  }
+
+  if(endOfPostHeader()) {
     setContentInfo();
   }
 
   if(endOfRequest()) {
     printInfo();
 
-    if(buffer.length() > MAX_PAYLOAD) {
-      std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
-      std::string answer = "HTTP/1.1 413 Payload Too Large \r\n\r\n";
-      if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-        perror("send/reactToMessage");
-      }
-      // end = true;
-    }
-
     if(method == "CONNECT") {
-      std::cout << "Method CONNECT" << std::endl;
-      setDataFromMessage();
-      if(connectWithServer()) {
-        message = "HTTP/1.1 200 OK \r\n\r\n";
-      } else {
-        message = "HTTP/1.1 502 Bad Gateway \r\n\r\n";
-      }
-      dataToProcess = message.length();
-      dataProcessed = 0;
-      sending = true;
-      fromClient = false;
+      handleConnect();
     }
     else {
       beginCommunicationWithServer();
@@ -102,11 +97,30 @@ void Connection::reactToMessage() {
   }
 }
 
-bool Connection::endIfNotHTTPRequest() {
+void Connection::handleConnect() {
+  setDataFromMessage();
+  if(connectWithServer()) {
+    message = "HTTP/1.1 200 OK \r\n\r\n";
+    std::cout << "Connected with server " << serverSocket << std::endl;
+  } else {
+    message = "HTTP/1.1 502 Bad Gateway \r\n\r\n";
+  }
+
+  dataToProcess = message.length();
+  dataProcessed = 0;
+  sending = true;
+  fromClient = false;
+}
+
+void Connection::handleHTTPSRequest() {
+
+}
+
+bool Connection::endIfDifferentProtocol() {
   if(buffer.find("HTTP/") == std::string::npos) {
     std::string answer = "HTTP/1.1 501 Not Implemented\r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-      perror("send/endIfNotHTTPRequest");
+      perror("send/endIfDifferentProtocol");
     }
 
     end = true;

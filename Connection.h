@@ -28,15 +28,18 @@ private:
     void resetData();
 
 	bool receiveRequest();
-	void reactToMessage();
 	void printInfo();
 
-	bool endIfNotHTTPRequest();
+    void handleHTTPRequest();
+    void handleHTTPSRequest();
+
+	bool endIfDifferentProtocol();
 	void setMethodInfo();
 	void setContentInfo();
 	bool endOfRequest() { return (method != "POST" && message.find("\r\n\r\n") != std::string::npos) || (method == "POST" && dataProcessed == dataToProcess); }
-	bool endOfHeader() { return method == "POST" && message.find("\r\n\r\n") != std::string::npos; }
+	bool endOfPostHeader() { return method == "POST" && message.find("\r\n\r\n") != std::string::npos; }
 
+    void handleConnect();
     bool connectWithServer();
 	void beginCommunicationWithServer();
 	void setDataFromMessage();
