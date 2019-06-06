@@ -113,7 +113,16 @@ void Connection::handleConnect() {
 }
 
 void Connection::handleHTTPSRequest() {
+  message += buffer;
 
+  if(message.find("\r\n\r\n")) {
+    dataToProcess = message.length();
+    dataProcessed = 0;
+    sending = true;
+
+    sendRequest();
+    receiveResponse();
+  }
 }
 
 bool Connection::endIfDifferentProtocol() {
@@ -199,10 +208,6 @@ bool Connection::connectWithServer() {
 
   int port = isHttps ? 443 : 80;
 
-  if(isHttps) {
-    std::cout << "HTTPS connection" << std::endl;
-  } 
-
   sockaddr_in sin;
   memset(&sin, 0, sizeof(sin));
   sin.sin_family = AF_INET;
@@ -283,10 +288,7 @@ void Connection::sendResponse() {
     resetData();
     sending = false;
     fromClient = true;
-    
   }
-
-  // end = true;
 }
 
 void Connection::resetData() {
