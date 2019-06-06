@@ -77,12 +77,6 @@ void ProxyServer::handleEvents() {
     else {
       Connection& connection = findConnection();
       
-      if(connection.isTimeExceeded()) {
-        std::cout << "Time exceeded\n";
-        closeConnection();
-        continue;
-      }
-      
       if(sockets[fdIndex].revents & POLLIN) { 
         connection.handleIncoming();
       }
@@ -91,8 +85,13 @@ void ProxyServer::handleEvents() {
         connection.handleOutcoming();
       }
 
-      if(connection.isEnded())
+      if(connection.isEnded()) {
         closeConnection();
+      }
+      else if(connection.isTimeExceeded()) {
+        std::cout << "Time exceeded\n";
+        closeConnection();
+      }
     }
   }
 }

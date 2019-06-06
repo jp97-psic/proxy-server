@@ -26,13 +26,14 @@ Connection::Connection(int socket) : clientSocket(socket) {
 void Connection::handleOutcoming() {
   if(sending && !fromClient) {
     sendResponse();
+    lastTimestamp = std::chrono::system_clock::now();
   }
 }
 
 void Connection::handleIncoming() {
   if(!sending && fromClient && receiveRequest()) {
-    // lastTimestamp = std::chrono::system_clock::now();
     reactToMessage();
+    lastTimestamp = std::chrono::system_clock::now();
   }
 }
 
