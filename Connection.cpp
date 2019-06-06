@@ -157,25 +157,23 @@ void Connection::beginCommunicationWithServer() {
   connectWithServer();
 
   message = method + " " + filePath + " HTTP/1.0" + message.substr(message.find(" HTTP/")+9);
+  dataToProcess = message.length();
   dataProcessed = 0;
   sending = true;
 }
 
 void Connection::setDataFromMessage() {
   hostname = message.substr(message.find("Host") + 4 + 2);
-  hostname = hostname.substr(0, hostname.find("\r\n"));  
 
   if(method == "CONNECT") {
-    isHttps = message.find(":443") != std::string::npos;
-    if(isHttps) {
-      hostname = hostname.substr(0, hostname.find(":443"));
-    }
-  } else {
-    isHttps = message.find(method + " https://") != std::string::npos;
+    isHttps = true;
+    hostname = hostname.substr(0, hostname.find(":443"));
+  }
+  else {
+    hostname = hostname.substr(0, hostname.find("\r\n"));  
     int begin = message.find(hostname) + hostname.length();
     int length = message.find("HTTP/") - begin - 1;
     filePath = message.substr(begin, length);
-    dataToProcess = message.length();
   }
 }
 
