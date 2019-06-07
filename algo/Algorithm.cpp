@@ -2,6 +2,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include "BigInt.h"
 
 
 void trim(std::string & str) {
@@ -14,17 +15,18 @@ std::string replace26Digits(std::string & str26Digits, std::string & replaceTo) 
   std::string trimmed(str26Digits);
   trim(trimmed);
 
-  long long firstTwoDigits = std::stoi(trimmed.substr(0, 2));
+  InfInt firstTwoDigits = std::stoi(trimmed.substr(0, 2));
   trimmed = trimmed.substr(2);
 
-  long long numberWithoutFirstTwoDigits;
-  std::istringstream iss(trimmed);
-  iss >> numberWithoutFirstTwoDigits;
-  numberWithoutFirstTwoDigits *= 1000000;
-  numberWithoutFirstTwoDigits += 252100;
+  InfInt numberWithoutFirstTwoDigits(trimmed);
+  
+  numberWithoutFirstTwoDigits = numberWithoutFirstTwoDigits * 1000000;
+  numberWithoutFirstTwoDigits = numberWithoutFirstTwoDigits + 252100;
 
-  long result = (firstTwoDigits + numberWithoutFirstTwoDigits) % 97;
-
+  InfInt sum = firstTwoDigits + numberWithoutFirstTwoDigits;
+  std::cout << "sum = " << sum << std::endl;
+  InfInt result = sum % 97;
+  std::cout << "result " << result << std::endl;
   if(result == 1) {
     int index = 0;
     for(unsigned i = 0; i < str26Digits.length(); ++i) {
