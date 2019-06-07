@@ -78,22 +78,21 @@ void ProxyServer::handleEvents() {
       Connection& connection = findConnection();
       
       if(sockets[fdIndex].revents & POLLIN) { 
-        std::cout << "=== incoming from " << sockets[fdIndex].fd << " ===" << std::endl;
-        int serverSocket = connection.handleIncoming(/*sockets[fdIndex].fd*/);
+        int serverSocket = connection.handlePollin(sockets[fdIndex].fd);
         if(serverSocket != -1)
           sockets.push_back({ serverSocket, POLLIN | POLLOUT, 0 });
       }
-      
-      if(sockets[fdIndex].revents & POLLOUT) {
-        connection.handleOutcoming();
-      }
-
-      if(connection.isEnded()) {
-        closeConnection();
+      else if(sockets[fdIndex].revents & POLLOUT) {
+        connection.handlePollout(sockets[fdIndex].fd);
       }
       else if(connection.isTimeExceeded()) {
         std::cout << "Time exceeded\n";
-        closeConnection();
+        closeConnection(connection.getClientSocket());
+      }
+      
+      if(connection.isEnded()) {
+        closeConnection(connection.getClientSocket());
+        continue;
       }
     }
   }
@@ -114,7 +113,6 @@ Connection& ProxyServer::findConnection() {
 void ProxyServer::startNewConnection() {
   if(connections.size() > CONNECTION_COUNT_LIMIT) {
     std::cout << "[ERROR] CONNECTIONS LIMIT EXCEDEED" << std::endl << std::endl;
-    closeConnection();
     return;
   }
 
@@ -132,21 +130,21 @@ void ProxyServer::startNewConnection() {
   }
 }
 
-void ProxyServer::closeConnection() {
-  int socket1 = sockets[fdIndex].fd;
+void ProxyServer::closeConnection(int clientSocket) {
   auto connIt = find_if(connections.begin(), connections.end(),
-    [=](Connection& c) { return c.getIncomingSocket() == socket1; });
-  int socket2 = connIt->getOutcomingSocket();
-
-  std::cout << "Closing connection " << socket1 << "->" << socket2 << std::endl;
-
-  close(socket1);
-  close(socket2);
+    [=](Connection& c) {return c.getClientSocket() == clientSocket;} );
+  int serverSocket = connIt->getServerSocket();
   connections.erase(connIt);
 
-  sockets.erase(sockets.begin() + fdIndex);
-  
-  auto sockIt = find_if(sockets.begin(), sockets.end(),
-    [=](pollfd& p) { return p.fd == socket2; });
-  sockets.erase(sockIt);
+  std::cout << "Closing connection " << clientSocket << "->" << serverSocket << std::endl;
+
+  close(clientSocket);
+  close(serverSocket);
+
+  auto sockIt1 = find_if(sockets.begin(), sockets.end(),
+    [=](pollfd& p) { return p.fd == clientSocket; });
+  auto sockIt2 = find_if(sockets.begin(), sockets.end(),
+    [=](pollfd& p) { return p.fd == serverSocket; });
+  sockets.erase(sockIt1);
+  sockets.erase(sockIt2);
 }

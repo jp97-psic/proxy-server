@@ -17,11 +17,14 @@ class Connection {
 public:
     Connection(int socket);
 
-    int getIncomingSocket() { return fromClient ? clientSocket : serverSocket; }
-    int getOutcomingSocket() { return fromClient ? serverSocket : clientSocket; }
-    int handleIncoming();
-    void handleOutcoming();
-    bool isEnded() { return end; }
+    void handlePollout(int socket);
+    int handlePollin(int socket);
+
+    int getClientSocket() const { return clientSocket; }
+    int getServerSocket() const { return serverSocket; }
+    int getIncomingSocket() const { return fromClient ? clientSocket : serverSocket; }
+    int getOutcomingSocket() const { return fromClient ? serverSocket : clientSocket; }
+    bool isEnded() const { return end; }
     bool isTimeExceeded();
 
 private:
@@ -29,6 +32,9 @@ private:
 
 	bool receiveRequest();
 	void printInfo();
+
+    void handleOutcoming();
+    int handleIncoming();
 
     int handleHTTPRequest();
     void handleHTTPSRequest();
@@ -44,7 +50,10 @@ private:
 	void beginCommunicationWithServer();
 	void setDataFromMessage();
     void sendRequest();
-	void receiveResponse();
+
+    void handleHTTPResponse();
+	void handleHTTPSResponse();
+
 	void sendResponse();
     
     int serverSocket = -1;

@@ -25,7 +25,7 @@ private:
 	std::vector<char> readFile (const char* path);
 	void handleEvents();
 	void startNewConnection();
-	void closeConnection();
+	void closeConnection(int clientSocket);
 	Connection& findConnection();
 
 	sockaddr_in sin;

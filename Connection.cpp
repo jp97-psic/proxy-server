@@ -8,7 +8,7 @@
 #include <netdb.h>
 
 #define MAX_PAYLOAD 8 * 1024
-#define BUFFER_SIZE 2000
+#define BUFFER_SIZE 10000
 
 
 bool Connection::isTimeExceeded() {
@@ -24,29 +24,46 @@ Connection::Connection(int socket) : clientSocket(socket) {
   lastTimestamp = std::chrono::system_clock::now();
 }
 
-void Connection::handleOutcoming() {
-  if(sending && !fromClient) {
-    lastTimestamp = std::chrono::system_clock::now();
-    sendResponse();
-  }
-  else if(sending && fromClient) {
-    lastTimestamp = std::chrono::system_clock::now();
-    sendRequest();
+void Connection::handlePollout(int socket) {
+  if(socket == getOutcomingSocket() && sending) {
+    handleOutcoming();
   }
 }
 
+int Connection::handlePollin(int socket) {
+  if(socket == getIncomingSocket() && !sending) {
+    return handleIncoming();
+  } 
+
+  return -1;
+}
+
+void Connection::handleOutcoming() {
+  std::cout << "== outcoming to " << getOutcomingSocket() << " ==" << std::endl;
+  if(!fromClient) {
+    sendResponse();
+  }
+  else if(fromClient) {
+    sendRequest();
+  }
+  lastTimestamp = std::chrono::system_clock::now();
+}
+
 int Connection::handleIncoming() {
+  std::cout << "== incoming from " << getIncomingSocket() << " ==" << std::endl;
   if(!sending && fromClient && receiveRequest()) {
-    lastTimestamp = std::chrono::system_clock::now();
     if(isHttps)
       handleHTTPSRequest();
     else
       return handleHTTPRequest();
   }
   else if(!sending && !fromClient) {
-    lastTimestamp = std::chrono::system_clock::now();
-    receiveResponse();
+    if(isHttps)
+      handleHTTPSResponse();
+    else
+      handleHTTPResponse();
   }
+  lastTimestamp = std::chrono::system_clock::now();
 
   return -1;
 }
@@ -127,16 +144,14 @@ void Connection::handleConnect() {
 }
 
 void Connection::handleHTTPSRequest() {
-  message += buffer;
+  message = buffer;
 
-  if(message.find("\r\n\r\n")) {
-    dataToProcess = message.length();
-    dataProcessed = 0;
-    sending = true;
 
-    sendRequest();
-    receiveResponse();
-  }
+
+  dataToProcess = message.length();
+  dataProcessed = 0;
+  sending = true;
+  fromClient = true;
 }
 
 bool Connection::endIfDifferentProtocol() {
@@ -238,7 +253,9 @@ bool Connection::connectWithServer() {
 }
 
 void Connection::sendRequest() {
-  std::cout << "I am sending this ===> \n" << message.substr(dataProcessed) << std::endl;
+  std::cout << "I am sending request:" << std::endl;
+  std::cout << message.substr(dataProcessed);
+  std::cout << std::endl;
   int sent = send(serverSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
   if(sent == -1) {
     perror("send/sendRequest");
@@ -259,7 +276,7 @@ void Connection::sendRequest() {
         
 }
 
-void Connection::receiveResponse() {
+void Connection::handleHTTPResponse() {
   buffer.resize(BUFFER_SIZE);
   int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
   if(status == -1) {
@@ -277,11 +294,33 @@ void Connection::receiveResponse() {
     else
       std::cout << message;
 
-    resetData();
     dataToProcess = message.length();
     dataProcessed = 0;
     sending = true;
   }
+}
+
+void Connection::handleHTTPSResponse() {
+  message.resize(BUFFER_SIZE);
+  int status = recv(serverSocket, const_cast<char*>(message.data()), message.length(), 0);
+  if(status == -1) {
+    perror("recv/receiveResponse");
+    end = true;
+    return;
+  }
+  message.resize(status);
+
+  std::cout << "\nRESPONSE from server on socket "<< serverSocket << ":\n";
+  if(message.length() > 700)
+    std::cout << message.substr(0,400) << "\n(tu ciąg dalszy)\n" << message.substr(message.length()-200);
+  else
+    std::cout << message;
+  std::cout << std::endl;
+
+  dataToProcess = message.length();
+  dataProcessed = 0;
+  fromClient = false;
+  sending = true;
 }
 
 void Connection::sendResponse() {
