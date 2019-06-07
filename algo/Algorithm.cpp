@@ -1,8 +1,5 @@
 #include <iostream>
 #include <string>
-#include <ctype.h>
-// #include <algorithm>
-#include <cctype>
 #include <sstream>
 #include <vector>
 
@@ -17,10 +14,10 @@ std::string replace26Digits(std::string & str26Digits, std::string & replaceTo) 
   std::string trimmed(str26Digits);
   trim(trimmed);
 
-  long firstTwoDigits = std::stoi(trimmed.substr(0, 2));
+  long long firstTwoDigits = std::stoi(trimmed.substr(0, 2));
   trimmed = trimmed.substr(2);
 
-  long numberWithoutFirstTwoDigits;
+  long long numberWithoutFirstTwoDigits;
   std::istringstream iss(trimmed);
   iss >> numberWithoutFirstTwoDigits;
   numberWithoutFirstTwoDigits *= 1000000;
@@ -54,7 +51,7 @@ std::string algorithm(std::string & inputString, std::string & replaceTo) {
       if(!foundFirstDigit) {
         start = i;
         foundFirstDigit = true;
-      }     
+      }
     }
     
     if(!isdigit(response[i]) && !isspace(response[i]) && digitCounter < seqLength ) {
