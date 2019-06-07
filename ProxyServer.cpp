@@ -78,7 +78,10 @@ void ProxyServer::handleEvents() {
       Connection& connection = findConnection();
       
       if(sockets[fdIndex].revents & POLLIN) { 
-        connection.handleIncoming();
+        std::cout << "=== incoming from " << sockets[fdIndex].fd << " ===" << std::endl;
+        int serverSocket = connection.handleIncoming(/*sockets[fdIndex].fd*/);
+        if(serverSocket != -1)
+          sockets.push_back({ serverSocket, POLLIN | POLLOUT, 0 });
       }
       
       if(sockets[fdIndex].revents & POLLOUT) {
@@ -100,11 +103,10 @@ Connection& ProxyServer::findConnection() {
   auto it = find_if(connections.begin(), connections.end(),
     [=](Connection& c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
   
-  // not needed now, because we deal only with client in this class
-  // if(it == connections.end()) {
-  //   it = find_if(connections.begin(), connections.end(),
-  //   [=](Connection& c) { return c.getOutcomingSocket() == sockets[fdIndex].fd; });
-  // }
+  if(it == connections.end()) {
+    it = find_if(connections.begin(), connections.end(),
+    [=](Connection& c) { return c.getOutcomingSocket() == sockets[fdIndex].fd; });
+  }
 
   return *it;
 }
@@ -131,14 +133,20 @@ void ProxyServer::startNewConnection() {
 }
 
 void ProxyServer::closeConnection() {
-  auto it = find_if(connections.begin(), connections.end(),
-    [=](Connection& c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
-    
-  std::cout << "Closing connection " << it->getIncomingSocket() << "->" << it->getOutcomingSocket() << std::endl;
+  int socket1 = sockets[fdIndex].fd;
+  auto connIt = find_if(connections.begin(), connections.end(),
+    [=](Connection& c) { return c.getIncomingSocket() == socket1; });
+  int socket2 = connIt->getOutcomingSocket();
 
-  close(it->getIncomingSocket());
-  close(it->getOutcomingSocket());
-  connections.erase(it);
+  std::cout << "Closing connection " << socket1 << "->" << socket2 << std::endl;
+
+  close(socket1);
+  close(socket2);
+  connections.erase(connIt);
 
   sockets.erase(sockets.begin() + fdIndex);
+  
+  auto sockIt = find_if(sockets.begin(), sockets.end(),
+    [=](pollfd& p) { return p.fd == socket2; });
+  sockets.erase(sockIt);
 }

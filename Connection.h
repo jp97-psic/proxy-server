@@ -19,7 +19,7 @@ public:
 
     int getIncomingSocket() { return fromClient ? clientSocket : serverSocket; }
     int getOutcomingSocket() { return fromClient ? serverSocket : clientSocket; }
-    void handleIncoming();
+    int handleIncoming();
     void handleOutcoming();
     bool isEnded() { return end; }
     bool isTimeExceeded();
@@ -30,7 +30,7 @@ private:
 	bool receiveRequest();
 	void printInfo();
 
-    void handleHTTPRequest();
+    int handleHTTPRequest();
     void handleHTTPSRequest();
 
 	bool endIfDifferentProtocol();
@@ -47,7 +47,7 @@ private:
 	void receiveResponse();
 	void sendResponse();
     
-    int serverSocket;
+    int serverSocket = -1;
     int clientSocket;
 
     bool fromClient = true;

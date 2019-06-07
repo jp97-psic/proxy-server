@@ -8,6 +8,7 @@
 #include <netdb.h>
 
 #define MAX_PAYLOAD 8 * 1024
+#define BUFFER_SIZE 2000
 
 
 bool Connection::isTimeExceeded() {
@@ -25,27 +26,38 @@ Connection::Connection(int socket) : clientSocket(socket) {
 
 void Connection::handleOutcoming() {
   if(sending && !fromClient) {
-    sendResponse();
     lastTimestamp = std::chrono::system_clock::now();
+    sendResponse();
+  }
+  else if(sending && fromClient) {
+    lastTimestamp = std::chrono::system_clock::now();
+    sendRequest();
   }
 }
 
-void Connection::handleIncoming() {
+int Connection::handleIncoming() {
   if(!sending && fromClient && receiveRequest()) {
+    lastTimestamp = std::chrono::system_clock::now();
     if(isHttps)
       handleHTTPSRequest();
     else
-      handleHTTPRequest();
-    lastTimestamp = std::chrono::system_clock::now();
+      return handleHTTPRequest();
   }
+  else if(!sending && !fromClient) {
+    lastTimestamp = std::chrono::system_clock::now();
+    receiveResponse();
+  }
+
+  return -1;
 }
 
 bool Connection::receiveRequest() {
-  buffer.resize(100);
+  buffer.resize(BUFFER_SIZE);
 
   int received = recv(clientSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
   if(received == -1) {
     perror("recv/receiveRequest");
+    end = true;
     return false;
   }
 
@@ -57,10 +69,10 @@ bool Connection::receiveRequest() {
   return true;
 }
 
-void Connection::handleHTTPRequest() {
+int Connection::handleHTTPRequest() {
   if(message.empty()) {
     if(endIfDifferentProtocol())
-      return;
+      return -1;
     setMethodInfo();
   }
 
@@ -76,7 +88,7 @@ void Connection::handleHTTPRequest() {
       perror("send/reactToMessage");
     }
     end = true;
-    return;
+    return -1;
   }
 
   if(endOfPostHeader()) {
@@ -91,10 +103,12 @@ void Connection::handleHTTPRequest() {
     }
     else {
       beginCommunicationWithServer();
-      sendRequest();
-      receiveResponse();
     }
+
+    return serverSocket;
   }
+
+  return -1;
 }
 
 void Connection::handleConnect() {
@@ -131,7 +145,6 @@ bool Connection::endIfDifferentProtocol() {
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
       perror("send/endIfDifferentProtocol");
     }
-
     end = true;
     return true;
   }
@@ -190,7 +203,8 @@ bool Connection::connectWithServer() {
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if(serverSocket == -1) {
     perror("socket/connectWithServer");
-    exit(1);
+    end = true;
+    return false;
   }
 
   int option = 1;
@@ -203,7 +217,8 @@ bool Connection::connectWithServer() {
   hostent *host = gethostbyname(hostname.data());
   if(host == NULL) {
     printf("%s is unavailable\n", hostname.data());
-    exit(1);
+    end = true;
+    return false;
   }
 
   int port = isHttps ? 443 : 80;
@@ -216,32 +231,27 @@ bool Connection::connectWithServer() {
 
   if(connect(serverSocket, (sockaddr*) &sin, sizeof(sin)) == -1 && errno != 115) {
     perror("connect/connectWithServer");
+    end = true;
     return false;
   }
   return true;
 }
 
 void Connection::sendRequest() {
-  std::vector<pollfd> innerFds;
-  innerFds.push_back({ serverSocket, POLLOUT, 0 });
-
-  int sent = 0;
-  while(sent != message.length()) {
-    poll(innerFds.data(), innerFds.size(), -1);
-
-    if(innerFds[0].revents & POLLOUT) {
-      std::cout << "I am sending this ===> \n" << message << std::endl;
-      int status = send(serverSocket, message.data() + sent, message.length() - sent, MSG_NOSIGNAL);
-      if(status == -1) {
-        perror("send/sendRequest");
-      } else {
-        sent += status;
-      }
-    }
+  std::cout << "I am sending this ===> \n" << message.substr(dataProcessed) << std::endl;
+  int sent = send(serverSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
+  if(sent == -1) {
+    perror("send/sendRequest");
+    end = true;
+  } else {
+    dataProcessed += sent;
   }
 
-  fromClient = false;
-  sending = false;
+  if(dataProcessed == dataToProcess) {
+    resetData();
+    fromClient = false;
+    sending = false;
+  }
   
   // part for troubleshooting
   // if(message.find("Accept: image/webp") != std::string::npos || message.find("Accept: text/css") != std::string::npos)
@@ -250,36 +260,35 @@ void Connection::sendRequest() {
 }
 
 void Connection::receiveResponse() {
-  std::vector<pollfd> innerFds;
-  innerFds.push_back({ serverSocket, POLLIN, 0 });
-  
-  resetData();
-  while(!endOfRequest()) {
-    poll(innerFds.data(), innerFds.size(), -1);
-
-    if(innerFds[0].revents & POLLIN) {
-      buffer.resize(100000);
-      int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
-      buffer.resize(status);
-      message += buffer;
-    }
+  buffer.resize(BUFFER_SIZE);
+  int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
+  if(status == -1) {
+    perror("recv/receiveResponse");
+    end = true;
+    return;
   }
+  buffer.resize(status);
+  message += buffer;
 
-  std::cout << "\nRESPONSE from server on socket "<< serverSocket << ":\n";
-  if(message.length() > 700)
-    std::cout << message.substr(0,400) << "\n(tu ciąg dalszy)\n" << message.substr(message.length()-200);
-  else
-    std::cout << message;
+  if(endOfRequest()) {
+    std::cout << "\nRESPONSE from server on socket "<< serverSocket << ":\n";
+    if(message.length() > 700)
+      std::cout << message.substr(0,400) << "\n(tu ciąg dalszy)\n" << message.substr(message.length()-200);
+    else
+      std::cout << message;
 
-  dataToProcess = message.length();
-  dataProcessed = 0;
-  sending = true;
+    resetData();
+    dataToProcess = message.length();
+    dataProcessed = 0;
+    sending = true;
+  }
 }
 
 void Connection::sendResponse() {
   int status = send(clientSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
   if(status == -1) {
     perror("send/sendResponse");
+    end = true;
   } else {
     dataProcessed += status;
   }
@@ -294,9 +303,6 @@ void Connection::sendResponse() {
 void Connection::resetData() {
   message = "";
   method = "";
-
-  hostname = "";
-  filePath = "";
 
   dataToProcess = 0; // also content size
   dataProcessed = -1; // also content received
