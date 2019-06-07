@@ -11,7 +11,7 @@ HDR = $(wildcard *.h)
 OBJ = $(SRC:.cpp=.o)
 DEP = $(SRC:.cpp=.d)
 
-APP = server
+APP = algo
 ZIP = $(APP).tgz
 
 all: $(APP)
