@@ -26,7 +26,7 @@ private:
 	void handleEvents();
 	void startNewConnection();
 	void closeConnection(int clientSocket);
-	Connection& findConnection();
+	std::vector<Connection>::iterator findConnection();
 
 	sockaddr_in sin;
 	const int proxySocket;

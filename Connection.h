@@ -18,6 +18,8 @@ public:
     Connection(int socket);
 
     void handlePollout(int socket);
+    
+    // returns -1 or server socket if new connection
     int handlePollin(int socket);
 
     int getClientSocket() const { return clientSocket; }
@@ -33,8 +35,8 @@ private:
 	bool receiveRequest();
 	void printInfo();
 
-    void handleOutcoming();
-    int handleIncoming();
+    void handleOutcoming(int socket);
+    int handleIncoming(int socket);
 
     int handleHTTPRequest();
     void handleHTTPSRequest();

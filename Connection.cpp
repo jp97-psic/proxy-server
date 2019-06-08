@@ -26,20 +26,20 @@ Connection::Connection(int socket) : clientSocket(socket) {
 
 void Connection::handlePollout(int socket) {
   if(socket == getOutcomingSocket() && sending) {
-    handleOutcoming();
+    handleOutcoming(socket);
   }
 }
 
 int Connection::handlePollin(int socket) {
-  if(socket == getIncomingSocket() && !sending) {
-    return handleIncoming();
+  if(!sending) {
+    return handleIncoming(socket);
   } 
 
   return -1;
 }
 
-void Connection::handleOutcoming() {
-  std::cout << "== outcoming to " << getOutcomingSocket() << " ==" << std::endl;
+void Connection::handleOutcoming(int socket) {
+  std::cout << "== outcoming to " << socket << " ==" << std::endl;
   if(!fromClient) {
     sendResponse();
   }
@@ -49,15 +49,19 @@ void Connection::handleOutcoming() {
   lastTimestamp = std::chrono::system_clock::now();
 }
 
-int Connection::handleIncoming() {
-  std::cout << "== incoming from " << getIncomingSocket() << " ==" << std::endl;
-  if(!sending && fromClient && receiveRequest()) {
-    if(isHttps)
-      handleHTTPSRequest();
-    else
-      return handleHTTPRequest();
+int Connection::handleIncoming(int socket) {
+  std::cout << "== incoming from " << socket << " ==" << std::endl;
+  if(fromClient && socket == clientSocket) {
+    if(receiveRequest()) {
+      if(isHttps)
+        handleHTTPSRequest();
+      else
+        return handleHTTPRequest();
+    }
   }
-  else if(!sending && !fromClient) {
+  else if(socket == serverSocket && (!fromClient || message == "")) {
+    fromClient = false;
+
     if(isHttps)
       handleHTTPSResponse();
     else
@@ -73,7 +77,7 @@ bool Connection::receiveRequest() {
 
   int received = recv(clientSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
   if(received == -1) {
-    perror("recv/receiveRequest");
+    perror("receiveRequest/recv");
     end = true;
     return false;
   }
@@ -102,7 +106,7 @@ int Connection::handleHTTPRequest() {
     std::cout << "[ERROR] 413 Payload Too Large" << std::endl;
     std::string answer = "HTTP/1.0 413 Payload Too Large \r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-      perror("send/reactToMessage");
+      perror("reactToMessage/send");
     }
     end = true;
     return -1;
@@ -132,9 +136,9 @@ void Connection::handleConnect() {
   setDataFromMessage();
   if(connectWithServer()) {
     message = "HTTP/1.0 200 OK \r\n\r\n";
-    std::cout << "Connected with server " << serverSocket << std::endl;
   } else {
     message = "HTTP/1.0 502 Bad Gateway \r\n\r\n";
+    std::cout << message;
   }
 
   dataToProcess = message.length();
@@ -145,9 +149,6 @@ void Connection::handleConnect() {
 
 void Connection::handleHTTPSRequest() {
   message = buffer;
-
-
-
   dataToProcess = message.length();
   dataProcessed = 0;
   sending = true;
@@ -158,7 +159,7 @@ bool Connection::endIfDifferentProtocol() {
   if(buffer.find("HTTP/") == std::string::npos) {
     std::string answer = "HTTP/1.0 501 Not Implemented\r\n\r\n";
     if(send(clientSocket, answer.data(), answer.length(), MSG_NOSIGNAL) == -1) {
-      perror("send/endIfDifferentProtocol");
+      perror("endIfDifferentProtocol/send");
     }
     end = true;
     return true;
@@ -191,7 +192,9 @@ void Connection::printInfo() {
 
 void Connection::beginCommunicationWithServer() {
   setDataFromMessage();
-  connectWithServer();
+  
+  if(serverSocket == -1)
+    connectWithServer();
 
   message = method + " " + filePath + " HTTP/1.0" + message.substr(message.find(" HTTP/")+9);
   dataToProcess = message.length();
@@ -249,6 +252,8 @@ bool Connection::connectWithServer() {
     end = true;
     return false;
   }
+  
+  std::cout << "Client " << clientSocket << " connected with " << hostname << " on " << serverSocket << std::endl;
   return true;
 }
 
@@ -258,7 +263,7 @@ void Connection::sendRequest() {
   std::cout << std::endl;
   int sent = send(serverSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
   if(sent == -1) {
-    perror("send/sendRequest");
+    perror("sendRequest/send");
     end = true;
   } else {
     dataProcessed += sent;
@@ -269,23 +274,24 @@ void Connection::sendRequest() {
     fromClient = false;
     sending = false;
   }
-  
-  // part for troubleshooting
-  // if(message.find("Accept: image/webp") != std::string::npos || message.find("Accept: text/css") != std::string::npos)
-  //   std::cout << " :) ";
-        
 }
 
 void Connection::handleHTTPResponse() {
   buffer.resize(BUFFER_SIZE);
   int status = recv(serverSocket, const_cast<char*>(buffer.data()), buffer.length(), 0);
   if(status == -1) {
-    perror("recv/receiveResponse");
-    end = true;
+    perror("handleHTTPResponse/recv");
+    // if(errno != 11) // Resource temporarily unavailable
+      end = true;
     return;
   }
   buffer.resize(status);
   message += buffer;
+
+  if(message.find("Content-Length:") != std::string::npos) {
+    method = "POST";
+    setContentInfo();
+  }
 
   if(endOfRequest()) {
     std::cout << "\nRESPONSE from server on socket "<< serverSocket << ":\n";
@@ -294,6 +300,7 @@ void Connection::handleHTTPResponse() {
     else
       std::cout << message;
 
+    method = "";
     dataToProcess = message.length();
     dataProcessed = 0;
     sending = true;
@@ -304,7 +311,7 @@ void Connection::handleHTTPSResponse() {
   message.resize(BUFFER_SIZE);
   int status = recv(serverSocket, const_cast<char*>(message.data()), message.length(), 0);
   if(status == -1) {
-    perror("recv/receiveResponse");
+    perror("handleHTTPSResponse/recv");
     end = true;
     return;
   }
@@ -326,7 +333,7 @@ void Connection::handleHTTPSResponse() {
 void Connection::sendResponse() {
   int status = send(clientSocket, message.data() + dataProcessed, message.length() - dataProcessed, MSG_NOSIGNAL);
   if(status == -1) {
-    perror("send/sendResponse");
+    perror("sendResponse/send");
     end = true;
   } else {
     dataProcessed += status;

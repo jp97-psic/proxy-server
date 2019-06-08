@@ -24,8 +24,8 @@ ProxyServer::~ProxyServer() {
   for(Connection& conn: connections) {
     std::cout << "Closing connection " << conn.getIncomingSocket() << "->" << conn.getOutcomingSocket() << std::endl;
 
-    close(conn.getIncomingSocket());
-    close(conn.getOutcomingSocket());
+    close(conn.getServerSocket());
+    close(conn.getClientSocket());
   }
 
 	close(proxySocket);
@@ -75,39 +75,44 @@ void ProxyServer::handleEvents() {
       }
     }
     else {
-      Connection& connection = findConnection();
+      auto connection = findConnection();
+
+      if(connection == connections.end()) {
+        std::cout << "!!! CAN NOT FIND CONNECTION for socket " << sockets[fdIndex].fd << "!!!" << std::endl;
+        break;
+      }
       
       if(sockets[fdIndex].revents & POLLIN) { 
-        int serverSocket = connection.handlePollin(sockets[fdIndex].fd);
+        int serverSocket = connection->handlePollin(sockets[fdIndex].fd);
         if(serverSocket != -1)
-          sockets.push_back({ serverSocket, POLLIN | POLLOUT, 0 });
+          sockets.push_back({ serverSocket, POLLOUT | POLLIN, 0 });
       }
       else if(sockets[fdIndex].revents & POLLOUT) {
-        connection.handlePollout(sockets[fdIndex].fd);
-      }
-      else if(connection.isTimeExceeded()) {
-        std::cout << "Time exceeded\n";
-        closeConnection(connection.getClientSocket());
+        connection->handlePollout(sockets[fdIndex].fd);
       }
       
-      if(connection.isEnded()) {
-        closeConnection(connection.getClientSocket());
-        continue;
+      if(connection->isTimeExceeded()) {
+        std::cout << "Time exceeded\n";
+        closeConnection(connection->getClientSocket());
+        break;
+      }
+      
+      if(connection->isEnded()) {
+        closeConnection(connection->getClientSocket());
+        break;
       }
     }
   }
 }
 
-Connection& ProxyServer::findConnection() {
+std::vector<Connection>::iterator ProxyServer::findConnection() {
   auto it = find_if(connections.begin(), connections.end(),
-    [=](Connection& c) { return c.getIncomingSocket() == sockets[fdIndex].fd; });
-  
-  if(it == connections.end()) {
-    it = find_if(connections.begin(), connections.end(),
-    [=](Connection& c) { return c.getOutcomingSocket() == sockets[fdIndex].fd; });
-  }
+    [=](Connection& c) {
+        return c.getClientSocket() == sockets[fdIndex].fd ||
+        c.getServerSocket() == sockets[fdIndex].fd;
+      });
 
-  return *it;
+  return it;
 }
 
 void ProxyServer::startNewConnection() {
@@ -138,13 +143,18 @@ void ProxyServer::closeConnection(int clientSocket) {
 
   std::cout << "Closing connection " << clientSocket << "->" << serverSocket << std::endl;
 
-  close(clientSocket);
-  close(serverSocket);
+  if(clientSocket > 0) {
+    close(clientSocket);
 
-  auto sockIt1 = find_if(sockets.begin(), sockets.end(),
-    [=](pollfd& p) { return p.fd == clientSocket; });
-  auto sockIt2 = find_if(sockets.begin(), sockets.end(),
-    [=](pollfd& p) { return p.fd == serverSocket; });
-  sockets.erase(sockIt1);
-  sockets.erase(sockIt2);
+    auto sockIt = find_if(sockets.begin(), sockets.end(),
+      [=](pollfd& p) { return p.fd == clientSocket; });
+    sockets.erase(sockIt);
+  }
+  
+  if(serverSocket > 0) {
+    close(serverSocket);
+    auto sockIt = find_if(sockets.begin(), sockets.end(),
+      [=](pollfd& p) { return p.fd == serverSocket; });
+    sockets.erase(sockIt);
+  }
 }
