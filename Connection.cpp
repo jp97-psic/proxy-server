@@ -1,4 +1,5 @@
 #include "Connection.h"
+#include "Algorithm.h"
 
 #include <fstream>
 #include <iostream>
@@ -123,6 +124,10 @@ int Connection::handleHTTPRequest() {
       handleConnect();
     }
     else {
+      if(method == "POST") {
+        useAlgorithm();
+      }
+
       beginCommunicationWithServer();
     }
 
@@ -294,6 +299,10 @@ void Connection::handleHTTPResponse() {
   }
 
   if(endOfRequest()) {
+    if(method == "POST") {
+      useAlgorithm();
+    }
+
     std::cout << "\nRESPONSE from server on socket "<< serverSocket << ":\n";
     if(message.length() > 700)
       std::cout << message.substr(0,400) << "\n(tu ciąg dalszy)\n" << message.substr(message.length()-200);
@@ -352,4 +361,13 @@ void Connection::resetData() {
 
   dataToProcess = 0; // also content size
   dataProcessed = -1; // also content received
+}
+
+void Connection::useAlgorithm() {
+  std::string header = message.substr(0, message.find("\r\n\r\n"));
+  std::string content = message.substr(message.find("\r\n\r\n"));
+  std::string numbers = "00000000000000000000000000";
+  content = algorithm(content, numbers);
+
+  message = header + content;
 }

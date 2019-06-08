@@ -2,7 +2,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
-#include "BigInt.h"
+#include "Algorithm.h"
 
 
 void trim(std::string & str) {
@@ -75,14 +75,14 @@ std::string algorithm(std::string & inputString, std::string & replaceTo) {
   }
 }
 
-int main() {
-  std::string replaceTo("00000000000000000000000000");
-  std::string shouldNotChange = "testtest123 4123412    341  234 1234123426testse";
+// int main() {
+//   std::string replaceTo("00000000000000000000000000");
+//   std::string shouldNotChange = "testtest123 4123412    341  234 1234123426testse";
 
-  std::string res = algorithm(shouldNotChange, replaceTo);
-  std::cout << shouldNotChange << std::endl << "should not change" << std::endl << res << std::endl;
+//   std::string res = algorithm(shouldNotChange, replaceTo);
+//   std::cout << shouldNotChange << std::endl << "should not change" << std::endl << res << std::endl;
 
-  std::string sholdChange = "testetstess00000000 0000000000 00000072testets";
-  res = algorithm(sholdChange, replaceTo);
-  std::cout << sholdChange << std::endl << "should change" << std::endl << res << std::endl;
-}
+//   std::string sholdChange = "testetstess00000000 0000000000 00000072testets";
+//   res = algorithm(sholdChange, replaceTo);
+//   std::cout << sholdChange << std::endl << "should change" << std::endl << res << std::endl;
+// }

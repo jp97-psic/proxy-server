@@ -31,6 +31,7 @@ public:
 
 private:
     void resetData();
+    void useAlgorithm();
 
 	bool receiveRequest();
 	void printInfo();
