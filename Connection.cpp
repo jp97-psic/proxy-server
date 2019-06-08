@@ -51,8 +51,8 @@ void Connection::handleOutcoming(int socket) {
 }
 
 int Connection::handleIncoming(int socket) {
-  std::cout << "== incoming from " << socket << " ==" << std::endl;
   if(fromClient && socket == clientSocket) {
+    std::cout << "== incoming from " << socket << " ==" << std::endl;
     if(receiveRequest()) {
       if(isHttps)
         handleHTTPSRequest();
@@ -61,6 +61,7 @@ int Connection::handleIncoming(int socket) {
     }
   }
   else if(socket == serverSocket && (!fromClient || message == "")) {
+    std::cout << "== incoming from " << socket << " ==" << std::endl;
     fromClient = false;
 
     if(isHttps)
